@@ -1,0 +1,5 @@
+{
+  "name": "Fleet Ops Management System",
+  "description": "A multi-tenant fleet and operations management system for transport businesses. This phase focuses on bus and vehicle operations, trip management, financials, and maintenance tracking for a single tenant using mock data.",
+  "requestFramePermissions": []
+}
