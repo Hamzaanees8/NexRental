@@ -226,7 +226,6 @@ const ExpenseForm: React.FC<{ vehicles: Vehicle[], onSave: (data: any) => void, 
   const [formData, setFormData] = useState({
     amount: 0,
     description: EXPENSE_TYPES[0],
-    date: new Date().toISOString().split('T')[0],
     vehicle_id: '',
     ...initialData,
     // Safely handle date if it exists

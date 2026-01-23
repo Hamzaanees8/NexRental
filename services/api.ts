@@ -134,6 +134,12 @@ export const getTransactions = async (): Promise<Transaction[]> => {
     return data as Transaction[];
 };
 
+export const updateTransaction = async (id: string, transaction: Partial<Transaction>): Promise<Transaction> => {
+    const { data, error } = await supabase.from('financial_transactions').update(transaction).eq('id', id).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Transaction;
+};
+
 export const createExpense = async (expenseData: Omit<Transaction, 'id' | 'tenant_id' | 'type'>): Promise<Transaction> => {
     const newExpense = {
         ...expenseData,
@@ -203,6 +209,12 @@ export const createCustomer = async (customer: Omit<Customer, 'id' | 'tenant_id'
     return data[0] as Customer;
 };
 
+export const updateCustomer = async (id: string, customer: Partial<Customer>): Promise<Customer> => {
+    const { data, error } = await supabase.from('customers').update(customer).eq('id', id).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Customer;
+};
+
 // Drivers
 export const getDrivers = async (): Promise<Driver[]> => {
     const { data, error } = await supabase.from('drivers').select('*').eq('tenant_id', TENANT_ID);
@@ -212,6 +224,12 @@ export const getDrivers = async (): Promise<Driver[]> => {
 
 export const createDriver = async (driver: Omit<Driver, 'id' | 'tenant_id'>): Promise<Driver> => {
     const { data, error } = await supabase.from('drivers').insert([{ ...driver, tenant_id: TENANT_ID }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Driver;
+};
+
+export const updateDriver = async (id: string, driver: Partial<Driver>): Promise<Driver> => {
+    const { data, error } = await supabase.from('drivers').update(driver).eq('id', id).select();
     if (error) throw new Error(error.message);
     return data[0] as Driver;
 };
@@ -229,6 +247,12 @@ export const createRental = async (rental: Omit<Rental, 'id' | 'tenant_id' | 'st
         tenant_id: TENANT_ID,
         status: RentalStatus.Reserved
     }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Rental;
+};
+
+export const updateRental = async (id: string, rental: Partial<Rental>): Promise<Rental> => {
+    const { data, error } = await supabase.from('rentals').update(rental).eq('id', id).select();
     if (error) throw new Error(error.message);
     return data[0] as Rental;
 };
