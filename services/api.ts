@@ -1,138 +1,100 @@
 
 
-import { 
-    Vehicle, Trip, Transaction, MaintenanceRecord, FinancialSummary, 
-    VehicleStatus, TripStatus, TransactionType, MaintenanceType, Voucher, PassengerLog, ContractType 
+import {
+    Vehicle, Trip, Transaction, MaintenanceRecord, FinancialSummary,
+    VehicleStatus, TripStatus, TransactionType, MaintenanceType, Voucher, PassengerLog, ContractType
 } from '../types';
 import { TENANT_ID } from '../constants';
+import { supabase } from './supabaseClient';
 
-// --- MOCK DATABASE ---
-
-const today = new Date();
-const yesterday = new Date(today);
-yesterday.setDate(yesterday.getDate() - 1);
-const twoDaysAgo = new Date(today);
-twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-
-let vehicles: Vehicle[] = [
-    { vehicleId: 'v001', tenantId: TENANT_ID, type: 'Bus', licensePlate: 'BUS-1856', capacity: 50, status: VehicleStatus.Active, lastMaintenanceDate: twoDaysAgo.toISOString() },
-    { vehicleId: 'v002', tenantId: TENANT_ID, type: 'Van', licensePlate: 'VAN-4422', capacity: 12, status: VehicleStatus.Active, lastMaintenanceDate: new Date('2024-05-10').toISOString() },
-    { vehicleId: 'v003', tenantId: TENANT_ID, type: 'Bus', licensePlate: 'BUS-1753', capacity: 55, status: VehicleStatus.InMaintenance, lastMaintenanceDate: new Date('2024-04-20').toISOString() },
-    { vehicleId: 'v004', tenantId: TENANT_ID, type: 'Minibus', licensePlate: 'MINI-7756', capacity: 20, status: VehicleStatus.Inactive, lastMaintenanceDate: new Date('2023-12-01').toISOString() },
-];
-
-let trips: Trip[] = [
-    { 
-        tripId: 't001', tenantId: TENANT_ID, vehicleId: 'v001', driverId: 'd01', 
-        route: ['Lahore', 'Islamabad'], departureTime: '08:00', status: TripStatus.Completed, date: today.toISOString(), 
-        voucher: { 
-            passengerLogs: [{ from: 'Lahore', to: 'Islamabad', count: 45, fare: 1200 }],
-            totalRevenue: 54000 
-        } 
-    },
-    { tripId: 't002', tenantId: TENANT_ID, vehicleId: 'v002', driverId: 'd02', route: ['Islamabad', 'Lahore'], departureTime: '09:30', status: TripStatus.EnRoute, date: today.toISOString() },
-    { tripId: 't003', tenantId: TENANT_ID, vehicleId: 'v001', driverId: 'd01', route: ['Lahore', 'Sargodha', 'Islamabad'], departureTime: '14:00', status: TripStatus.Scheduled, date: today.toISOString() },
-    { 
-        tripId: 't004', tenantId: TENANT_ID, vehicleId: 'v001', driverId: 'd03', 
-        route: ['Multan', 'Lahore'], departureTime: '11:00', status: TripStatus.Completed, date: yesterday.toISOString(), 
-        voucher: { 
-            passengerLogs: [{ from: 'Multan', to: 'Lahore', count: 30, fare: 1000 }],
-            totalRevenue: 30000 
-        } 
-    },
-];
-
-let maintenanceRecords: MaintenanceRecord[] = [
-    { recordId: 'm001', tenantId: TENANT_ID, vehicleId: 'v003', type: MaintenanceType.EngineRepair, cost: 15000, date: new Date('2024-07-20').toISOString(), notes: 'Full engine overhaul.' },
-    { recordId: 'm002', tenantId: TENANT_ID, vehicleId: 'v001', type: MaintenanceType.TireChange, cost: 2000, date: new Date('2024-07-15').toISOString(), notes: 'Replaced all 4 tires.' },
-    { recordId: 'm003', tenantId: TENANT_ID, vehicleId: 'v001', type: MaintenanceType.Fuel, cost: 350, date: today.toISOString(), notes: 'Full tank.' },
-    { recordId: 'm004', tenantId: TENANT_ID, vehicleId: 'v002', type: MaintenanceType.Fuel, cost: 120, date: yesterday.toISOString(), notes: 'Full tank.' },
-];
-
-let transactions: Transaction[] = [
-    { transactionId: 'tr001', tenantId: TENANT_ID, type: TransactionType.Voucher, amount: 54000, description: 'Voucher for trip t001', date: today.toISOString(), relatedTripId: 't001', relatedVehicleId: 'v001'},
-    { transactionId: 'tr002', tenantId: TENANT_ID, type: TransactionType.Voucher, amount: 30000, description: 'Voucher for trip t004', date: yesterday.toISOString(), relatedTripId: 't004', relatedVehicleId: 'v001'},
-    { transactionId: 'tr003', tenantId: TENANT_ID, type: TransactionType.Expense, amount: 15000, description: 'Engine Repair for BUS-1753', date: new Date('2024-07-20').toISOString(), relatedVehicleId: 'v003'},
-    { transactionId: 'tr004', tenantId: TENANT_ID, type: TransactionType.Expense, amount: 350, description: 'Fuel for BUS-1856', date: today.toISOString(), relatedVehicleId: 'v001'},
-    { 
-        transactionId: 'tr005', 
-        tenantId: TENANT_ID, 
-        type: TransactionType.PrivateHire, 
-        amount: 12000, 
-        description: '3-day corporate hire to Murree', 
-        date: twoDaysAgo.toISOString(), // Start Date
-        endDate: today.toISOString(), // End Date
-        relatedVehicleId: 'v002',
-        contractType: ContractType.PerDay,
-    },
-];
-
-// --- MOCK API FUNCTIONS ---
-const mockApiCall = <T,>(data: T, delay = 500): Promise<T> => 
-    new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
+// --- API FUNCTIONS ---
 
 // Fleet Management
-export const getVehicles = () => mockApiCall(vehicles);
-export const getVehicle = (id: string) => mockApiCall(vehicles.find(v => v.vehicleId === id));
-export const createVehicle = (vehicleData: Omit<Vehicle, 'vehicleId' | 'tenantId'>) => {
-    const newVehicle: Vehicle = {
-        ...vehicleData,
-        vehicleId: `v${Date.now()}`,
-        tenantId: TENANT_ID,
-    };
-    vehicles.push(newVehicle);
-    return mockApiCall(newVehicle);
+export const getVehicles = async (): Promise<Vehicle[]> => {
+    const { data, error } = await supabase.from('vehicles').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Vehicle[];
 };
-export const updateVehicle = (id: string, updates: Partial<Vehicle>) => {
-    vehicles = vehicles.map(v => v.vehicleId === id ? { ...v, ...updates } : v);
-    return mockApiCall(vehicles.find(v => v.vehicleId === id));
+
+export const getVehicle = async (id: string): Promise<Vehicle | undefined> => {
+    const { data, error } = await supabase.from('vehicles').select('*').eq('id', id).single();
+    if (error) throw new Error(error.message);
+    return data as Vehicle;
+};
+
+export const createVehicle = async (vehicleData: Omit<Vehicle, 'id' | 'tenant_id'>): Promise<Vehicle> => {
+    const { data, error } = await supabase.from('vehicles').insert([{ ...vehicleData, tenant_id: TENANT_ID }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Vehicle;
+};
+
+export const updateVehicle = async (id: string, updates: Partial<Vehicle>): Promise<Vehicle> => {
+    const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Vehicle;
 };
 
 // Trip Management
-export const getTrips = () => mockApiCall(trips);
-export const getTrip = (id: string) => mockApiCall(trips.find(t => t.tripId === id));
-export const createTrip = (tripData: Omit<Trip, 'tripId' | 'tenantId' | 'status'>) => {
-    const newTrip: Trip = {
-        ...tripData,
-        tripId: `t${Date.now()}`,
-        tenantId: TENANT_ID,
-        status: TripStatus.Scheduled,
-    };
-    trips.push(newTrip);
-    return mockApiCall(newTrip);
+export const getTrips = async (): Promise<Trip[]> => {
+    const { data, error } = await supabase.from('trips').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Trip[];
 };
-export const updateTripStatus = (id: string, status: TripStatus) => {
-    trips = trips.map(t => t.tripId === id ? { ...t, status } : t);
-    return mockApiCall(trips.find(t => t.tripId === id));
+
+export const getTrip = async (id: string): Promise<Trip | undefined> => {
+    const { data, error } = await supabase.from('trips').select('*').eq('id', id).single();
+    if (error) throw new Error(error.message);
+    return data as Trip;
 };
-export const generateVoucher = (id: string, passengerLogs: PassengerLog[]) => {
+
+export const createTrip = async (tripData: Omit<Trip, 'id' | 'tenant_id' | 'status'>): Promise<Trip> => {
+    const { data, error } = await supabase.from('trips').insert([{ ...tripData, tenant_id: TENANT_ID, status: TripStatus.Scheduled }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Trip;
+};
+
+export const updateTripStatus = async (id: string, status: TripStatus): Promise<Trip> => {
+    const { data, error } = await supabase.from('trips').update({ status }).eq('id', id).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Trip;
+};
+
+export const generateVoucher = async (id: string, passengerLogs: PassengerLog[]): Promise<Trip> => {
     const totalRevenue = passengerLogs.reduce((sum, log) => sum + (log.count * log.fare), 0);
     const newVoucher: Voucher = { passengerLogs, totalRevenue };
-    
-    trips = trips.map(t => t.tripId === id ? { ...t, voucher: newVoucher, status: TripStatus.Completed } : t);
-    const updatedTrip = trips.find(t => t.tripId === id);
-    
-    if(updatedTrip && updatedTrip.voucher) {
-        // Remove old transaction for this trip if it exists, to prevent duplicates
-        transactions = transactions.filter(t => t.relatedTripId !== id);
 
-        const newTransaction: Transaction = {
-            transactionId: `tr${Date.now()}`,
-            tenantId: TENANT_ID,
+    const { data: updatedTrip, error: updateTripError } = await supabase
+        .from('trips')
+        .update({ voucher: newVoucher, status: TripStatus.Completed })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (updateTripError) throw new Error(updateTripError.message);
+
+    if (updatedTrip && updatedTrip.voucher) {
+        await supabase.from('financial_transactions').delete().eq('trip_id', id);
+
+        const newTransaction: Omit<Transaction, 'id'> = {
+            tenant_id: TENANT_ID,
             type: TransactionType.Voucher,
-            amount: updatedTrip.voucher.totalRevenue,
+            amount: totalRevenue,
             description: `Voucher for trip ${updatedTrip.route.join(' → ')}`,
             date: updatedTrip.date,
-            relatedTripId: id,
-            relatedVehicleId: updatedTrip.vehicleId,
+            trip_id: id,
+            vehicle_id: updatedTrip.vehicle_id,
         };
-        transactions.push(newTransaction);
+        const { error: transactionError } = await supabase.from('financial_transactions').insert([newTransaction]);
+        if (transactionError) throw new Error(transactionError.message);
     }
-    return mockApiCall(updatedTrip);
+    return updatedTrip as Trip;
 };
 
 // Financials
-export const getFinanceSummary = (): Promise<FinancialSummary> => {
+export const getFinanceSummary = async (): Promise<FinancialSummary> => {
+    const { data: transactions, error } = await supabase.from('financial_transactions').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+
     const summary: FinancialSummary = {
         totalRevenue: 0,
         totalCosts: 0,
@@ -163,52 +125,212 @@ export const getFinanceSummary = (): Promise<FinancialSummary> => {
         profit: dailyMap[date].revenue - dailyMap[date].costs
     }));
 
-    return mockApiCall(summary);
+    return summary;
 };
-export const getTransactions = () => mockApiCall(transactions);
-export const createExpense = (expenseData: Omit<Transaction, 'transactionId' | 'tenantId' | 'type'>) => {
-    const newExpense: Transaction = {
+
+export const getTransactions = async (): Promise<Transaction[]> => {
+    const { data, error } = await supabase.from('financial_transactions').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Transaction[];
+};
+
+export const createExpense = async (expenseData: Omit<Transaction, 'id' | 'tenant_id' | 'type'>): Promise<Transaction> => {
+    const newExpense = {
         ...expenseData,
-        transactionId: `tr${Date.now()}`,
-        tenantId: TENANT_ID,
+        tenant_id: TENANT_ID,
         type: TransactionType.Expense,
     };
-    transactions.push(newExpense);
-    return mockApiCall(newExpense);
+    const { data, error } = await supabase.from('financial_transactions').insert([newExpense]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Transaction;
 };
-export const createPrivateHire = (hireData: Omit<Transaction, 'transactionId' | 'tenantId' | 'type'>) => {
-    const newHire: Transaction = {
+
+export const createPrivateHire = async (hireData: Omit<Transaction, 'id' | 'tenant_id' | 'type'>): Promise<Transaction> => {
+    const newHire = {
         ...hireData,
-        transactionId: `tr${Date.now()}`,
-        tenantId: TENANT_ID,
+        tenant_id: TENANT_ID,
         type: TransactionType.PrivateHire,
     };
-    transactions.push(newHire);
-    return mockApiCall(newHire);
+    const { data, error } = await supabase.from('financial_transactions').insert([newHire]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Transaction;
 }
 
 // Maintenance
-export const getMaintenanceHistory = () => mockApiCall(maintenanceRecords);
-export const createMaintenanceRecord = (recordData: Omit<MaintenanceRecord, 'recordId' | 'tenantId'>) => {
-    const newRecord: MaintenanceRecord = {
+export const getMaintenanceHistory = async (): Promise<MaintenanceRecord[]> => {
+    const { data, error } = await supabase.from('maintenance_records').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as MaintenanceRecord[];
+};
+
+export const createMaintenanceRecord = async (recordData: Omit<MaintenanceRecord, 'id' | 'tenant_id'>): Promise<MaintenanceRecord> => {
+    const newRecord = {
         ...recordData,
-        recordId: `m${Date.now()}`,
-        tenantId: TENANT_ID,
+        tenant_id: TENANT_ID,
     };
-    maintenanceRecords.push(newRecord);
-    
+    const { data, error } = await supabase.from('maintenance_records').insert([newRecord]).select();
+    if (error) throw new Error(error.message);
+
     // Create corresponding expense transaction
-    const vehicle = vehicles.find(v => v.vehicleId === newRecord.vehicleId);
-    const newTransaction: Transaction = {
-        transactionId: `tr${Date.now()}`,
-        tenantId: TENANT_ID,
+    const vehicle = await getVehicle(newRecord.vehicle_id);
+    const newTransaction = {
+        tenant_id: TENANT_ID,
         type: TransactionType.Expense,
         amount: newRecord.cost,
-        description: `${newRecord.type} for ${vehicle?.licensePlate || newRecord.vehicleId}`,
+        description: `${newRecord.type} for ${vehicle?.license_plate || newRecord.vehicle_id}`,
         date: newRecord.date,
-        relatedVehicleId: newRecord.vehicleId,
+        vehicle_id: newRecord.vehicle_id,
     };
-    transactions.push(newTransaction);
+    await createExpense(newTransaction);
 
-    return mockApiCall(newRecord);
+    return data[0] as MaintenanceRecord;
+};
+
+// --- NEW MODULES: Customers, Drivers, Rentals ---
+
+// Customers
+import { Customer, Driver, Rental, RentalStatus, TransactionType as TxType } from '../types';
+
+export const getCustomers = async (): Promise<Customer[]> => {
+    const { data, error } = await supabase.from('customers').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Customer[];
+};
+
+export const createCustomer = async (customer: Omit<Customer, 'id' | 'tenant_id'>): Promise<Customer> => {
+    const { data, error } = await supabase.from('customers').insert([{ ...customer, tenant_id: TENANT_ID }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Customer;
+};
+
+// Drivers
+export const getDrivers = async (): Promise<Driver[]> => {
+    const { data, error } = await supabase.from('drivers').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Driver[];
+};
+
+export const createDriver = async (driver: Omit<Driver, 'id' | 'tenant_id'>): Promise<Driver> => {
+    const { data, error } = await supabase.from('drivers').insert([{ ...driver, tenant_id: TENANT_ID }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Driver;
+};
+
+// Rentals
+export const getRentals = async (): Promise<Rental[]> => {
+    const { data, error } = await supabase.from('rentals').select('*').eq('tenant_id', TENANT_ID);
+    if (error) throw new Error(error.message);
+    return data as Rental[];
+};
+
+export const createRental = async (rental: Omit<Rental, 'id' | 'tenant_id' | 'status'>): Promise<Rental> => {
+    const { data, error } = await supabase.from('rentals').insert([{
+        ...rental,
+        tenant_id: TENANT_ID,
+        status: RentalStatus.Reserved
+    }]).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Rental;
+};
+
+export const updateRentalStatus = async (id: string, status: RentalStatus): Promise<Rental> => {
+    const { data, error } = await supabase.from('rentals').update({ status }).eq('id', id).select();
+    if (error) throw new Error(error.message);
+    return data[0] as Rental;
+};
+
+// Complex Logic: Complete Rental
+export const completeRental = async (id: string, completionData: {
+    odometer_end: number;
+    fuel_cost: number;
+    toll_cost: number;
+    driver_allowance: number;
+    other_expenses: number;
+}): Promise<Rental> => {
+    // 1. Fetch current rental
+    const { data: rental, error: fetchError } = await supabase.from('rentals').select('*').eq('id', id).single();
+    if (fetchError || !rental) throw new Error("Rental not found");
+
+    const total_cost = completionData.fuel_cost + completionData.toll_cost + completionData.driver_allowance + completionData.other_expenses;
+    const net_profit = rental.rent_amount - total_cost;
+
+    // 2. Update Rental Record
+    const { data: updatedRental, error: updateError } = await supabase
+        .from('rentals')
+        .update({
+            ...completionData,
+            total_cost,
+            net_profit,
+            status: RentalStatus.Completed,
+            end_time: new Date().toISOString() // Or user provided
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    if (updateError) throw new Error(updateError.message);
+
+    // 3. Update Vehicle (Odometer + M-Tag Deduction)
+    const { data: vehicle } = await supabase.from('vehicles').select('m_tag_balance').eq('id', rental.vehicle_id).single();
+    const currentMTag = vehicle?.m_tag_balance || 0;
+
+    await supabase.from('vehicles').update({
+        current_odometer: completionData.odometer_end,
+        m_tag_balance: currentMTag - completionData.toll_cost
+    }).eq('id', rental.vehicle_id);
+
+    // 4. Create Financial Transaction (Income)
+    await supabase.from('financial_transactions').insert([{
+        tenant_id: TENANT_ID,
+        rental_id: id,
+        type: TxType.RentalIncome,
+        amount: rental.rent_amount,
+        description: `Rental Income: ${rental.id}`,
+        date: new Date().toISOString(),
+        vehicle_id: rental.vehicle_id
+    }]);
+
+    // 5. Log Expenses
+    if (total_cost > 0) {
+        await supabase.from('financial_transactions').insert([{
+            tenant_id: TENANT_ID,
+            rental_id: id,
+            type: TxType.TripExpense,
+            amount: total_cost,
+            description: `Rental Expenses (Fuel: ${completionData.fuel_cost}, Toll: ${completionData.toll_cost}, Driver: ${completionData.driver_allowance})`,
+            date: new Date().toISOString(),
+            vehicle_id: rental.vehicle_id
+        }]);
+    }
+
+    return updatedRental as Rental;
+};
+
+// M-Tag Wallet
+export const topUpMTag = async (vehicleId: string, amount: number): Promise<Vehicle> => {
+    // 1. Get current vehicle
+    const { data: vehicle, error: fetchError } = await supabase.from('vehicles').select('*').eq('id', vehicleId).single();
+    if (fetchError || !vehicle) throw new Error("Vehicle not found");
+
+    // 2. Update Balance
+    const newBalance = (vehicle.m_tag_balance || 0) + amount;
+    const { data: updatedVehicle, error: updateError } = await supabase
+        .from('vehicles')
+        .update({ m_tag_balance: newBalance })
+        .eq('id', vehicleId)
+        .select()
+        .single();
+
+    if (updateError) throw new Error(updateError.message);
+
+    // 3. Log Transaction (Expense)
+    await supabase.from('financial_transactions').insert([{
+        tenant_id: TENANT_ID,
+        vehicle_id: vehicleId,
+        type: TxType.MTagTopUp,
+        amount: amount,
+        description: `M-Tag Top Up for ${vehicle.license_plate}`,
+        date: new Date().toISOString()
+    }]);
+
+    return updatedVehicle as Vehicle;
 };

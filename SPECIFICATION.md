@@ -1,14 +1,14 @@
 # Fleet Ops Management System: Technical & Functional Specification
 
 ## 1. Project Overview
-**Fleet Ops** is a management suite for transport operators (primarily bus and van services). It facilitates the end-to-end lifecycle of fleet operations, from vehicle procurement and maintenance to trip scheduling, passenger revenue collection (vouchers), and private hire contracts.
+**Fleet Ops** is a management suite for transport operators (primarily bus and van services). It facilitates the end-to-end lifecycle of fleet operations, from vehicle procurement and maintenance to trip scheduling, passenger revenue collection (vouchers), and private hire contracts. We need to add car rental managment system in this as well, where there is also a fleet of cars which are rented for trips which can last from few hours to full day to multiple days. Rent can be with driver or without driver, inter city or intra city etc.
 
 ### Technical Stack
 *   **Frontend:** React 19 (Hooks-based), TypeScript.
 *   **Styling:** Tailwind CSS (Utility-first).
 *   **Visualization:** Recharts (SVG-based charting).
-*   **Data Layer:** Mock Service Layer with asynchronous `Promise`-based API simulations (`services/api.ts`).
-*   **Architecture:** View-based SPA (Single Page Application) with a centralized sidebar navigation.
+*   **Data Layer:** Mock Service Layer with asynchronous `Promise`-based API simulations (`services/api.ts`). Needs to be converted to real database (intended to use supabase)
+*   **Architecture:** View-based SPA (Single Page Application) with a centralized sidebar navigation. Need recomendation for better suitable approach as the app will be hosted online on a server or tools like vercel etc. Potentially will be used a lot on mobile phones as well. 
 
 ---
 

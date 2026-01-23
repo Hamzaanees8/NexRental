@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardIcon, FleetIcon, TripIcon, FinanceIcon, MaintenanceIcon, LogoIcon } from './icons';
 
-type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance';
+type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'drivers';
 
 interface SidebarProps {
   currentView: View;
@@ -12,9 +12,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
     { id: 'fleet', label: 'Fleet Management', icon: <FleetIcon /> },
-    { id: 'trips', label: 'Trip Management', icon: <TripIcon /> },
+    { id: 'rentals', label: 'Rental Management', icon: <TripIcon /> },
     { id: 'financials', label: 'Financials', icon: <FinanceIcon /> },
     { id: 'maintenance', label: 'Maintenance', icon: <MaintenanceIcon /> },
+    { id: 'customers', label: 'Customers', icon: <span className="font-bold text-lg">C</span> }, // Placeholder icon
+    { id: 'drivers', label: 'Drivers', icon: <span className="font-bold text-lg">D</span> }, // Placeholder icon
   ];
 
   return (
@@ -30,13 +32,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
               <button
                 onClick={() => setCurrentView(item.id as View)}
                 className={`flex items-center w-full px-4 py-3 my-1 text-sm font-medium rounded-lg transition-colors duration-200
-                  ${
-                    currentView === item.id
-                      ? 'bg-indigo-50 text-indigo-600'
-                      : 'text-slate-600 hover:bg-slate-100'
+                  ${currentView === item.id
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-600 hover:bg-slate-100'
                   }`}
               >
-                <span className="mr-3">{item.icon}</span>
+                <span className="mr-3 w-6 text-center">{item.icon}</span>
                 {item.label}
               </button>
             </li>

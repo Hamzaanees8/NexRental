@@ -7,13 +7,36 @@ export enum VehicleStatus {
 }
 
 export interface Vehicle {
-  vehicleId: string;
-  tenantId: string;
+  id: string;
+  tenant_id: string; // Changed from tenantId
   type: string;
-  licensePlate: string;
-  capacity: number;
+  license_plate: string; // Changed from licensePlate
+  capacity?: number; // Optional as it might not be in DB or is extra
   status: VehicleStatus;
-  lastMaintenanceDate: string; // ISO date string
+  last_maintenance_date: string; // ISO date string
+  m_tag_balance?: number; // Pre-paid toll wallet balance
+  current_odometer?: number; // Latest mileage reading
+}
+
+export interface Customer {
+  id: string;
+  tenant_id: string; // Changed from tenantId
+  name: string;
+  phone: string;
+  whatsapp?: string;
+  cnic?: string;
+  license_number?: string;
+  address?: string;
+}
+
+export interface Driver {
+  id: string;
+  tenant_id: string; // Changed from tenantId
+  name: string;
+  phone: string;
+  license_no: string;
+  status: 'Available' | 'On Trip' | 'Inactive';
+  base_salary?: number;
 }
 
 export enum TripStatus {
@@ -36,9 +59,9 @@ export interface Voucher {
 }
 
 export interface Trip {
-  tripId: string;
-  tenantId: string;
-  vehicleId: string;
+  id: string;
+  tenant_id: string;
+  vehicle_id: string;
   driverId: string;
   route: string[];
   departureTime: string; // HH:MM
@@ -47,30 +70,77 @@ export interface Trip {
   date: string; // ISO date string
 }
 
+export enum RentalType {
+  SelfDrive = 'Self Drive',
+  WithDriver = 'With Driver'
+}
+
+export enum RentalStatus {
+  Reserved = 'Reserved',
+  Active = 'Active',
+  Completed = 'Completed',
+  Settled = 'Settled',
+  Cancelled = 'Cancelled'
+}
+
+export interface Rental {
+  id: string;
+  tenant_id: string;
+  vehicle_id: string;
+  customer_id: string;
+  driver_id?: string; // Nullable if Self Drive
+  rental_type: RentalType; // Changed from type to match DB
+  status: RentalStatus;
+
+  start_time: string; // ISO Datetime
+  end_time: string;   // ISO Datetime
+
+  odometer_start?: number;
+  odometer_end?: number;
+
+  rent_amount: number;
+  security_deposit?: number; // Refundable
+
+  inspection_notes?: string;
+
+  // Expenses incurred during this specific rental
+  fuel_cost?: number;
+  toll_cost?: number;
+  driver_allowance?: number;
+  other_expenses?: number;
+
+  total_cost?: number; // Sum of expenses
+  net_profit?: number; // rent_amount - total_cost
+}
+
 export enum TransactionType {
   Voucher = 'Voucher',
   PrivateHire = 'Private Hire',
   Expense = 'Expense',
+  MTagTopUp = 'M-Tag TopUp',
+  RentalIncome = 'Rental Income',
+  TripExpense = 'Trip Expense' // Fuel, Tolls etc specific to a rental
 }
 
 export enum ContractType {
-    PerDay = 'Per Day',
-    FixedPrice = 'Fixed Price',
+  PerDay = 'Per Day',
+  FixedPrice = 'Fixed Price',
 }
 
 export interface Transaction {
-  transactionId: string;
-  tenantId: string;
+  id: string;
+  tenant_id: string;
   type: TransactionType;
   amount: number;
   description: string;
   date: string; // For single-day transactions or start date of a hire
-  relatedTripId?: string;
-  relatedVehicleId?: string;
+  trip_id?: string;
+  vehicle_id?: string;
+  rental_id?: string;
 
   // Private Hire specific fields
-  contractType?: ContractType;
-  endDate?: string; 
+  contract_type?: ContractType; // matches DB field name if snake case
+  endDate?: string; // This one might be jsonb or missing in DB, let's keep it camel if inconsistent, but likely snake.
 }
 
 export enum MaintenanceType {
@@ -83,9 +153,9 @@ export enum MaintenanceType {
 }
 
 export interface MaintenanceRecord {
-  recordId: string;
-  tenantId: string;
-  vehicleId: string;
+  id: string;
+  tenant_id: string;
+  vehicle_id: string;
   type: MaintenanceType;
   cost: number;
   date: string; // ISO date string
@@ -93,8 +163,8 @@ export interface MaintenanceRecord {
 }
 
 export interface FinancialSummary {
-    totalRevenue: number;
-    totalCosts: number;
-    netProfit: number;
-    dailyData: { date: string; revenue: number; costs: number; profit: number }[];
+  totalRevenue: number;
+  totalCosts: number;
+  netProfit: number;
+  dailyData: { date: string; revenue: number; costs: number; profit: number }[];
 }

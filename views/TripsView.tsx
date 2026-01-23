@@ -47,7 +47,7 @@ const TripsView: React.FC = () => {
     setIsVoucherModalOpen(false);
   };
   
-  const handleSaveTrip = async (formData: Omit<Trip, 'tripId' | 'tenantId' | 'status'>) => {
+  const handleSaveTrip = async (formData: Omit<Trip, 'id' | 'tenantId' | 'status'>) => {
     await createTrip(formData);
     fetchTrips();
     handleCloseModals();
@@ -92,10 +92,10 @@ const TripsView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {trips.map((trip) => (
-                  <tr key={trip.tripId}>
+                  <tr key={trip.id}>
                     <td className="p-4 text-slate-700">{new Date(trip.date).toLocaleDateString()}</td>
                     <td className="p-4 font-medium text-slate-800">{trip.route.join(' → ')}</td>
-                    <td className="p-4 text-slate-700">{vehicles.find(v => v.vehicleId === trip.vehicleId)?.licensePlate || 'N/A'}</td>
+                    <td className="p-4 text-slate-700">{vehicles.find(v => v.id === trip.vehicle_id)?.licensePlate || 'N/A'}</td>
                     <td className="p-4 text-slate-700">{trip.departureTime}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[trip.status]}`}>
@@ -104,7 +104,7 @@ const TripsView: React.FC = () => {
                     </td>
                     <td className="p-4 text-right font-mono text-green-700">{formatCurrency(trip.voucher?.totalRevenue || 0)}</td>
                     <td className="p-4 space-x-2">
-                      {trip.status === TripStatus.Scheduled && <Button size="sm" onClick={() => handleUpdateStatus(trip.tripId, TripStatus.EnRoute)}>Start</Button>}
+                      {trip.status === TripStatus.Scheduled && <Button size="sm" onClick={() => handleUpdateStatus(trip.id, TripStatus.EnRoute)}>Start</Button>}
                       <Button variant="secondary" size="sm" onClick={() => handleOpenVoucherModal(trip)}>Voucher</Button>
                     </td>
                   </tr>
@@ -134,13 +134,13 @@ const TripsView: React.FC = () => {
 interface TripFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: Omit<Trip, 'id' | 'tenantId' | 'status'>) => void;
   vehicles: Vehicle[];
 }
 
 const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, vehicles }) => {
   const [formData, setFormData] = useState({
-    vehicleId: '',
+    vehicle_id: '',
     driverId: 'd-temp-01',
     route: [TRIP_TERMINALS[0], TRIP_TERMINALS[1]],
     departureTime: '09:00',
@@ -148,10 +148,10 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
   });
 
   useEffect(() => {
-    if (vehicles.length > 0 && !formData.vehicleId) {
-      setFormData(prev => ({ ...prev, vehicleId: vehicles[0].vehicleId }));
+    if (vehicles.length > 0 && !formData.vehicle_id) {
+      setFormData(prev => ({ ...prev, vehicle_id: vehicles[0].id }));
     }
-  }, [vehicles, isOpen, formData.vehicleId]);
+  }, [vehicles, isOpen, formData.vehicle_id]);
   
   const handleRouteChange = (value: string, index: number) => {
     const newRoute = [...formData.route];
@@ -214,8 +214,8 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
        
         <div>
           <label className="block text-sm font-medium text-slate-700">Vehicle</label>
-          <select name="vehicleId" value={formData.vehicleId} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
-            {vehicles.filter(v => v.status === 'Active').map(v => <option key={v.vehicleId} value={v.vehicleId}>{v.licensePlate} ({v.type})</option>)}
+          <select name="vehicle_id" value={formData.vehicle_id} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
+            {vehicles.filter(v => v.status === 'Active').map(v => <option key={v.id} value={v.id}>{v.licensePlate} ({v.type})</option>)}
           </select>
         </div>
         <div>
@@ -293,7 +293,7 @@ const VoucherFormModal: React.FC<VoucherFormModalProps> = ({ isOpen, onClose, on
             }))
             .filter(log => log.count > 0);
         
-        onSave(trip.tripId, passengerLogs);
+        onSave(trip.id, passengerLogs);
     };
 
     return (

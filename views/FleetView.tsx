@@ -1,17 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { getVehicles, createVehicle, updateVehicle } from '../services/api';
+import { getVehicles, createVehicle, updateVehicle, topUpMTag } from '../services/api';
 import { Vehicle, VehicleStatus } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { PlusIcon } from '../components/icons';
-import { STATUS_COLORS, VEHICLE_TYPES } from '../constants';
+import { STATUS_COLORS, VEHICLE_TYPES, formatCurrency } from '../constants';
 
 const FleetView: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Vehicle Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+
+  // Top Up Modal State
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
+  const [topUpVehicle, setTopUpVehicle] = useState<Vehicle | null>(null);
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -38,10 +48,10 @@ const FleetView: React.FC = () => {
     setSelectedVehicle(null);
     setIsModalOpen(false);
   };
-  
-  const handleSaveVehicle = async (formData: Omit<Vehicle, 'vehicleId' | 'tenantId'>) => {
+
+  const handleSaveVehicle = async (formData: Omit<Vehicle, 'id' | 'tenant_id'>) => {
     if (selectedVehicle) {
-      await updateVehicle(selectedVehicle.vehicleId, formData);
+      await updateVehicle(selectedVehicle.id, formData);
     } else {
       await createVehicle(formData);
     }
@@ -49,145 +59,226 @@ const FleetView: React.FC = () => {
     handleCloseModal();
   };
 
+  const openTopUp = (e: React.MouseEvent, vehicle: Vehicle) => {
+    e.stopPropagation();
+    setTopUpVehicle(vehicle);
+    setTopUpAmount('');
+    setIsTopUpOpen(true);
+  }
+
+  const handleTopUp = async () => {
+    if (!topUpVehicle || !topUpAmount) return;
+    try {
+      await topUpMTag(topUpVehicle.id, Number(topUpAmount));
+      setIsTopUpOpen(false);
+      setTopUpVehicle(null);
+      fetchVehicles(); // Refresh data
+    } catch (e) {
+      alert("Top up failed");
+    }
+  }
+
+  const filteredVehicles = vehicles.filter(v =>
+    v.license_plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    v.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    v.status.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading Fleet...</div>;
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-slate-800">Fleet Management</h1>
-        <Button onClick={() => handleOpenModal()}>
-          <PlusIcon />
-          <span className="ml-2">Add Vehicle</span>
-        </Button>
+    <div className="space-y-6 max-w-4xl mx-auto pb-20">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">Fleet</h1>
+          <p className="text-sm text-slate-500">{vehicles.length} Vehicles Managed</p>
+        </div>
+        <button
+          onClick={() => handleOpenModal()}
+          className="w-full sm:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
+        >
+          <PlusIcon className="mr-2" /> Add Vehicle
+        </button>
       </div>
-      {loading ? (
-        <p>Loading vehicles...</p>
-      ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">License Plate</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Type</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Capacity</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Last Maintenance</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {vehicles.map((vehicle) => (
-                  <tr key={vehicle.vehicleId}>
-                    <td className="p-4 font-mono font-medium text-indigo-600">{vehicle.licensePlate}</td>
-                    <td className="p-4 text-slate-700">{vehicle.type}</td>
-                    <td className="p-4 text-slate-700">{vehicle.capacity}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[vehicle.status]}`}>
-                        {vehicle.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-700">{new Date(vehicle.lastMaintenanceDate).toLocaleDateString()}</td>
-                    <td className="p-4">
-                      <Button variant="secondary" size="sm" onClick={() => handleOpenModal(vehicle)}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search by plate, type..."
+          className="w-full p-4 pl-12 rounded-xl border-none shadow-sm bg-white focus:ring-2 focus:ring-blue-500 transition"
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+        <span className="absolute left-4 top-4 text-slate-400">🔍</span>
+      </div>
+
+      {/* Card Grid */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {filteredVehicles.map(vehicle => (
+          <div
+            key={vehicle.id}
+            onClick={() => handleOpenModal(vehicle)}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition cursor-pointer relative overflow-hidden"
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <h3 className="font-mono font-bold text-lg text-indigo-700">{vehicle.license_plate}</h3>
+                <p className="text-xs font-bold uppercase text-slate-400 mt-1">{vehicle.type}</p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLORS[vehicle.status]}`}>
+                {vehicle.status}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-end mt-4 pt-4 border-t border-slate-50">
+              <div>
+                <p className="text-xs text-slate-400">M-Tag Balance</p>
+                <div className="flex items-center gap-2">
+                  <span className={`font-mono font-bold text-lg ${(vehicle.m_tag_balance || 0) < 500 ? 'text-red-500' : 'text-slate-700'}`}>
+                    {formatCurrency(vehicle.m_tag_balance || 0)}
+                  </span>
+                  <button onClick={(e) => openTopUp(e, vehicle)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 font-medium">
+                    + Add
+                  </button>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-400">Maintained</p>
+                <p className="text-sm font-medium text-slate-600">{new Date(vehicle.last_maintenance_date).toLocaleDateString()}</p>
+              </div>
+            </div>
           </div>
-        </Card>
+        ))}
+        {filteredVehicles.length === 0 && (
+          <div className="text-center py-12 text-slate-400 col-span-full">
+            <p>No vehicles found matching "{searchTerm}"</p>
+          </div>
+        )}
+      </div>
+
+      {/* Edit/Create Modal - Mobile Friendly Overlay */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={handleCloseModal}>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+              <h2 className="text-lg font-bold">{selectedVehicle ? 'Edit Vehicle' : 'New Vehicle'}</h2>
+              <button onClick={handleCloseModal} className="text-slate-500 hover:text-slate-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="p-6">
+              <VehicleForm
+                vehicle={selectedVehicle}
+                onSave={handleSaveVehicle}
+                onCancel={handleCloseModal}
+              />
+            </div>
+          </div>
+        </div>
       )}
-      <VehicleFormModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSaveVehicle}
-        vehicle={selectedVehicle}
-      />
+
+      {/* Top Up Modal */}
+      {isTopUpOpen && topUpVehicle && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsTopUpOpen(false)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-2 text-slate-800">Top Up M-Tag</h3>
+            <div className="p-3 bg-blue-50 rounded-lg mb-6">
+              <p className="text-xs text-blue-600 uppercase font-bold mb-1">Vehicle</p>
+              <p className="font-mono font-bold text-blue-900 text-lg">{topUpVehicle.license_plate}</p>
+              <p className="text-blue-700 text-sm">Current: {formatCurrency(topUpVehicle.m_tag_balance || 0)}</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-slate-700 mb-2">Amount to Add</label>
+              <input
+                type="number"
+                className="w-full p-4 border-2 border-slate-200 rounded-xl font-mono text-2xl focus:border-blue-500 focus:ring-0 transition"
+                placeholder="1000"
+                value={topUpAmount}
+                onChange={e => setTopUpAmount(Number(e.target.value))}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setIsTopUpOpen(false)} className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition">Cancel</button>
+              <button onClick={handleTopUp} disabled={!topUpAmount} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 transition active:scale-95">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-interface VehicleFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: Omit<Vehicle, 'vehicleId' | 'tenantId'>) => void;
-  vehicle: Vehicle | null;
-}
-
-const VehicleFormModal: React.FC<VehicleFormModalProps> = ({ isOpen, onClose, onSave, vehicle }) => {
+// Refactored Form Component
+const VehicleForm: React.FC<{
+  vehicle: Vehicle | null,
+  onSave: (data: any) => void,
+  onCancel: () => void
+}> = ({ vehicle, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
-    licensePlate: '',
+    license_plate: '',
     type: VEHICLE_TYPES[0],
     capacity: 0,
     status: VehicleStatus.Active,
-    lastMaintenanceDate: new Date().toISOString().split('T')[0],
+    last_maintenance_date: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
     if (vehicle) {
       setFormData({
-        licensePlate: vehicle.licensePlate,
+        license_plate: vehicle.license_plate,
         type: vehicle.type,
-        capacity: vehicle.capacity,
+        capacity: vehicle.capacity || 0,
         status: vehicle.status,
-        lastMaintenanceDate: new Date(vehicle.lastMaintenanceDate).toISOString().split('T')[0],
-      });
-    } else {
-      setFormData({
-        licensePlate: '',
-        type: VEHICLE_TYPES[0],
-        capacity: 0,
-        status: VehicleStatus.Active,
-        lastMaintenanceDate: new Date().toISOString().split('T')[0],
+        last_maintenance_date: new Date(vehicle.last_maintenance_date).toISOString().split('T')[0],
       });
     }
-  }, [vehicle, isOpen]);
+  }, [vehicle]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: name === 'capacity' ? parseInt(value) : value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-  
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={vehicle ? 'Edit Vehicle' : 'Add New Vehicle'}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">License Plate</label>
+        <input type="text" name="license_plate" value={formData.license_plate} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition" required />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700">License Plate</label>
-          <input type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-slate-900" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Vehicle Type</label>
-          <select name="type" value={formData.type} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-slate-900">
+          <label className="block text-sm font-bold text-slate-700 mb-1">Type</label>
+          <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition">
             {VEHICLE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700">Capacity</label>
-          <input type="number" name="capacity" value={formData.capacity} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-slate-900" required />
+          <label className="block text-sm font-bold text-slate-700 mb-1">Capacity</label>
+          <input type="number" name="capacity" value={formData.capacity} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition" required />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Status</label>
-          <select name="status" value={formData.status} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-slate-900">
-            {Object.values(VehicleStatus).map(status => <option key={status} value={status}>{status}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Last Maintenance Date</label>
-          <input type="date" name="lastMaintenanceDate" value={formData.lastMaintenanceDate} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-slate-900" required />
-        </div>
-        <div className="flex justify-end gap-4 pt-4">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Save Vehicle</Button>
-        </div>
-      </form>
-    </Modal>
+      </div>
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
+        <select name="status" value={formData.status} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition">
+          {Object.values(VehicleStatus).map(status => <option key={status} value={status}>{status}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">Last Maintenance</label>
+        <input type="date" name="last_maintenance_date" value={formData.last_maintenance_date} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition" required />
+      </div>
+      <div className="pt-4">
+        <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition">
+          {vehicle ? 'Save Changes' : 'Create Vehicle'}
+        </button>
+      </div>
+    </div>
   );
-};
+}
 
 export default FleetView;
