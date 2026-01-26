@@ -19,7 +19,7 @@ const TripsView: React.FC = () => {
     setLoading(true);
     try {
       const [tripsData, vehiclesData] = await Promise.all([getTrips(), getVehicles()]);
-      setTrips(tripsData.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setTrips(tripsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setVehicles(vehiclesData);
     } catch (error) {
       console.error("Failed to fetch trips:", error);
@@ -35,7 +35,7 @@ const TripsView: React.FC = () => {
   const handleOpenTripModal = () => {
     setIsTripModalOpen(true);
   };
-  
+
   const handleOpenVoucherModal = (trip: Trip) => {
     setSelectedTrip(trip);
     setIsVoucherModalOpen(true);
@@ -46,13 +46,13 @@ const TripsView: React.FC = () => {
     setIsTripModalOpen(false);
     setIsVoucherModalOpen(false);
   };
-  
+
   const handleSaveTrip = async (formData: Omit<Trip, 'id' | 'tenantId' | 'status'>) => {
     await createTrip(formData);
     fetchTrips();
     handleCloseModals();
   };
-  
+
   const handleSaveVoucher = async (tripId: string, passengerLogs: PassengerLog[]) => {
     await generateVoucher(tripId, passengerLogs);
     fetchTrips();
@@ -152,23 +152,23 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
       setFormData(prev => ({ ...prev, vehicle_id: vehicles[0].id }));
     }
   }, [vehicles, isOpen, formData.vehicle_id]);
-  
+
   const handleRouteChange = (value: string, index: number) => {
     const newRoute = [...formData.route];
     newRoute[index] = value;
-    setFormData(prev => ({...prev, route: newRoute}));
+    setFormData(prev => ({ ...prev, route: newRoute }));
   };
 
   const addStop = () => {
     const newRoute = [...formData.route];
     const lastStop = newRoute[newRoute.length - 1];
     newRoute.splice(newRoute.length - 1, 0, lastStop);
-    setFormData(prev => ({...prev, route: newRoute}));
+    setFormData(prev => ({ ...prev, route: newRoute }));
   };
-  
+
   const removeStop = (index: number) => {
     const newRoute = formData.route.filter((_, i) => i !== index);
-    setFormData(prev => ({...prev, route: newRoute}));
+    setFormData(prev => ({ ...prev, route: newRoute }));
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -184,9 +184,9 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
       alert("A route must have at least an origin and a destination.");
       return;
     }
-    onSave({...formData, route: cleanedRoute});
+    onSave({ ...formData, route: cleanedRoute });
   };
-  
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={'Schedule New Trip'}>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -206,12 +206,12 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
               </select>
             </div>
             {formData.route.length > 2 && index > 0 && index < formData.route.length - 1 && (
-                <button type="button" onClick={() => removeStop(index)} className="mt-6 p-2 text-red-500 hover:text-red-700">&times;</button>
+              <button type="button" onClick={() => removeStop(index)} className="mt-6 p-2 text-red-500 hover:text-red-700 rounded-lg cursor-pointer transition hover:bg-red-50">&times;</button>
             )}
           </div>
         ))}
-         <Button type="button" variant="secondary" size="sm" onClick={addStop}>+ Add Stop</Button>
-       
+        <Button type="button" variant="secondary" size="sm" onClick={addStop}>+ Add Stop</Button>
+
         <div>
           <label className="block text-sm font-medium text-slate-700">Vehicle</label>
           <select name="vehicle_id" value={formData.vehicle_id} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
@@ -240,99 +240,100 @@ interface VoucherFormModalProps {
 }
 
 const VoucherFormModal: React.FC<VoucherFormModalProps> = ({ isOpen, onClose, onSave, trip }) => {
-    
-    const possibleSegments = useMemo(() => {
-        const segments: {from: string; to: string; fare: number}[] = [];
-        if (!trip) return segments;
-        for (let i = 0; i < trip.route.length; i++) {
-            for (let j = i + 1; j < trip.route.length; j++) {
-                const from = trip.route[i];
-                const to = trip.route[j];
-                const fare = FARE_MATRIX[from]?.[to] || 0;
-                if (fare > 0) {
-                    segments.push({ from, to, fare });
-                }
-            }
+
+  const possibleSegments = useMemo(() => {
+    const segments: { from: string; to: string; fare: number }[] = [];
+    if (!trip) return segments;
+    for (let i = 0;i < trip.route.length;i++) {
+      for (let j = i + 1;j < trip.route.length;j++) {
+        const from = trip.route[i];
+        const to = trip.route[j];
+        const fare = FARE_MATRIX[from]?.[to] || 0;
+        if (fare > 0) {
+          segments.push({ from, to, fare });
         }
-        return segments;
-    }, [trip]);
-    
-    const [passengerCounts, setPassengerCounts] = useState<Record<string, number>>({});
-    
-    useEffect(() => {
-        if (trip?.voucher) {
-            const counts = trip.voucher.passengerLogs.reduce((acc, log) => {
-                acc[`${log.from}-${log.to}`] = log.count;
-                return acc;
-            }, {} as Record<string, number>);
-            setPassengerCounts(counts);
-        } else {
-            setPassengerCounts({});
-        }
-    }, [trip]);
+      }
+    }
+    return segments;
+  }, [trip]);
 
-    const handleCountChange = (from: string, to: string, count: number) => {
-        setPassengerCounts(prev => ({...prev, [`${from}-${to}`]: Math.max(0, count)}));
-    };
-    
-    const totalRevenue = useMemo(() => {
-        return possibleSegments.reduce((total, segment) => {
-            const count = passengerCounts[`${segment.from}-${segment.to}`] || 0;
-            return total + (count * segment.fare);
-        }, 0);
-    }, [passengerCounts, possibleSegments]);
+  const [passengerCounts, setPassengerCounts] = useState<Record<string, number>>({});
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const passengerLogs: PassengerLog[] = possibleSegments
-            .map(segment => ({
-                from: segment.from,
-                to: segment.to,
-                count: passengerCounts[`${segment.from}-${segment.to}`] || 0,
-                fare: segment.fare,
-            }))
-            .filter(log => log.count > 0);
-        
-        onSave(trip.id, passengerLogs);
-    };
+  useEffect(() => {
+    if (trip?.voucher) {
+      const counts = trip.voucher.passengerLogs.reduce((acc, log) => {
+        acc[`${log.from}-${log.to}`] = log.count;
+        return acc;
+      }, {} as Record<string, number>);
+      setPassengerCounts(counts);
+    } else {
+      setPassengerCounts({});
+    }
+  }, [trip]);
 
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Voucher for Trip: ${trip.route.join(' → ')}`}>
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                    {possibleSegments.map(({ from, to, fare }) => (
-                        <div key={`${from}-${to}`} className="grid grid-cols-3 items-center gap-4 p-2 rounded-md bg-slate-50">
-                            <div className="text-sm font-medium text-slate-800">
-                                {from} → {to}
-                                <span className="block text-xs text-slate-500">
-                                    {formatCurrency(fare)} / seat
-                                </span>
-                            </div>
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Passengers</label>
-                                <input 
-                                    type="number" 
-                                    value={passengerCounts[`${from}-${to}`] || ''}
-                                    onChange={(e) => handleCountChange(from, to, parseInt(e.target.value) || 0)}
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500"
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-                    ))}
-                    {possibleSegments.length === 0 && <p className="text-slate-500 text-center">No valid fare segments for this route.</p>}
-                </div>
-                <div className="mt-6 pt-4 border-t flex justify-between items-center">
-                    <h4 className="text-lg font-semibold">Total Revenue:</h4>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRevenue)}</p>
-                </div>
-                <div className="flex justify-end gap-4 pt-4">
-                    <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
-                    <Button type="submit">Save Voucher</Button>
-                </div>
-            </form>
-        </Modal>
-    )
+  const handleCountChange = (from: string, to: string, count: number) => {
+    setPassengerCounts(prev => ({ ...prev, [`${from}-${to}`]: Math.max(0, count) }));
+  };
+
+  const totalRevenue = useMemo(() => {
+    return possibleSegments.reduce((total, segment) => {
+      const count = passengerCounts[`${segment.from}-${segment.to}`] || 0;
+      return total + (count * segment.fare);
+    }, 0);
+  }, [passengerCounts, possibleSegments]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const passengerLogs: PassengerLog[] = possibleSegments
+      .map(segment => ({
+        from: segment.from,
+        to: segment.to,
+        count: passengerCounts[`${segment.from}-${segment.to}`] || 0,
+        fare: segment.fare,
+      }))
+      .filter(log => log.count > 0);
+
+    onSave(trip.id, passengerLogs);
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Voucher for Trip: ${trip.route.join(' → ')}`}>
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+          {possibleSegments.map(({ from, to, fare }) => (
+            <div key={`${from}-${to}`} className="grid grid-cols-3 items-center gap-4 p-2 rounded-md bg-slate-50">
+              <div className="text-sm font-medium text-slate-800">
+                {from} → {to}
+                <span className="block text-xs text-slate-500">
+                  {formatCurrency(fare)} / seat
+                </span>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-slate-700">Passengers</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={passengerCounts[`${from}-${to}`] || ''}
+                  onChange={(e) => handleCountChange(from, to, parseInt(e.target.value) || 0)}
+                  className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          ))}
+          {possibleSegments.length === 0 && <p className="text-slate-500 text-center">No valid fare segments for this route.</p>}
+        </div>
+        <div className="mt-6 pt-4 border-t flex justify-between items-center">
+          <h4 className="text-lg font-semibold">Total Revenue:</h4>
+          <p className="text-xl font-bold text-green-600">{formatCurrency(totalRevenue)}</p>
+        </div>
+        <div className="flex justify-end gap-4 pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+          <Button type="submit">Save Voucher</Button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 export default TripsView;

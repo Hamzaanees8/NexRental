@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
             <li key={item.id}>
               <button
                 onClick={() => setCurrentView(item.id as View)}
-                className={`flex items-center w-full px-4 py-3 my-1 text-sm font-medium rounded-lg transition-colors duration-200
+                className={`flex items-center w-full px-4 py-3 my-1 text-sm font-medium rounded-lg transition-colors duration-200 cursor-pointer
                   ${currentView === item.id
                     ? 'bg-indigo-50 text-indigo-600'
                     : 'text-slate-600 hover:bg-slate-100'

@@ -71,3 +71,5 @@ CREATE TABLE rentals (
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS rental_id UUID REFERENCES rentals(id);
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS contract_type TEXT; -- For Private Hire
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES vehicles(id);
+ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS end_date DATE;

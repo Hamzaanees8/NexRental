@@ -55,7 +55,11 @@ CREATE TABLE financial_transactions (
     trip_id UUID REFERENCES trips(id),
     rental_id UUID REFERENCES rentals(id),
     maintenance_id UUID REFERENCES maintenance_records(id),
-    tenant_id TEXT
+    tenant_id TEXT,
+    start_date DATE,
+    end_date DATE,
+    contract_type TEXT,
+    vehicle_id UUID REFERENCES vehicles(id)
 );
 
 -- Add the foreign key constraint from rentals to financial_transactions

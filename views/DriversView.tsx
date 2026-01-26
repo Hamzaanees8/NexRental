@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDrivers, createDriver, updateDriver } from '../services/api';
+import { getDrivers, createDriver, updateDriver, deleteDriver } from '../services/api';
 import { Driver } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
@@ -38,6 +38,16 @@ const DriversView: React.FC = () => {
         setEditingDriver(null);
     };
 
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("Are you sure you want to delete this driver?")) return;
+        try {
+            await deleteDriver(id);
+            fetchDrivers();
+        } catch (error) {
+            alert("Failed to delete driver");
+        }
+    };
+
     const openEditModal = (driver: Driver) => {
         setEditingDriver(driver);
         setIsModalOpen(true);
@@ -64,7 +74,7 @@ const DriversView: React.FC = () => {
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-20">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+            <div className="flex flex-col px-4 rounded-lg sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">Drivers</h1>
                     <p className="text-sm text-slate-500">{drivers.length} Personnel</p>
@@ -92,28 +102,50 @@ const DriversView: React.FC = () => {
             {/* Grid */}
             <div className="grid gap-4 sm:grid-cols-2">
                 {filteredDrivers.map(driver => (
-                    <div key={driver.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition relative group">
-                        <button
-                            onClick={() => openEditModal(driver)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"
-                        >
-                            ✎ Edit
-                        </button>
+                    <div key={driver.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition relative group pt-8">
+                        <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition">
+                            <button
+                                onClick={() => openEditModal(driver)}
+                                className="p-1.5 cursor-pointer text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                title="Edit"
+                            >
+                                ✎
+                            </button>
+                            <button
+                                onClick={() => handleDelete(driver.id)}
+                                className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                title="Delete"
+                            >
+                                🗑
+                            </button>
+                        </div>
                         <div className="flex justify-between items-start mb-3">
                             <div>
                                 <h3 className="font-bold text-lg text-slate-800">{driver.name}</h3>
-                                <p className="text-slate-500 text-sm font-mono">{driver.phone}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-slate-500 text-sm font-mono">{driver.phone}</p>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGES[driver.status as keyof typeof STATUS_BADGES]}`}>
+                                        {driver.status}
+                                    </span>
+                                </div>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${STATUS_BADGES[driver.status]}`}>
-                                {driver.status}
-                            </span>
                         </div>
 
-                        <div className="pt-3 mt-3 border-t border-slate-50 flex justify-between items-center text-sm">
-                            <span className="text-slate-400 font-mono">{driver.license_no}</span>
-                            {driver.base_salary && (
-                                <span className="font-bold text-slate-700">{formatCurrency(driver.base_salary)} / mo</span>
-                            )}
+                        <div className="pt-3 mt-3 border-t border-slate-50 space-y-2">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-400 font-mono">{driver.license_no}</span>
+                                {driver.base_salary && (
+                                    <span className="font-bold text-slate-700">{formatCurrency(driver.base_salary)} / month</span>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400">CNIC: {driver.cnic || 'N/A'}</span>
+                                {driver.license_expiry && (
+                                    <span className={`font-medium ${new Date(driver.license_expiry) < new Date() ? 'text-red-600' : (new Date(driver.license_expiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) < 30 ? 'text-orange-600' : 'text-slate-400'}`}>
+                                        License Expiry: {new Date(driver.license_expiry).toLocaleDateString()}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -122,10 +154,10 @@ const DriversView: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                    <div className="bg-white w-full max-w-lg rounded-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
                             <h2 className="text-lg font-bold">{editingDriver ? 'Edit Driver' : 'Register Driver'}</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none">&times;</button>
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none cursor-pointer rounded-lg p-1 hover:bg-slate-200 transition">&times;</button>
                         </div>
                         <div className="p-6">
                             <DriverForm onSave={handleSave} initialData={editingDriver || {}} />
@@ -142,48 +174,75 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
         name: '',
         phone: '',
         license_no: '',
+        cnic: '',
+        license_expiry: '',
         status: 'Available',
         base_salary: '',
+        internal_remarks: '',
         ...initialData
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: name === 'base_salary' ? Math.max(0, parseFloat(value) || 0) : value });
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto max-h-[400px]">
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
-                <input name="name" value={formData.name} onChange={handleChange} className="w-full p-3 border rounded-xl" required />
+                <input name="name" value={formData.name} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Phone</label>
-                    <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-3 border rounded-xl" required />
+                    <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Base Salary</label>
-                    <input type="number" name="base_salary" value={formData.base_salary} onChange={handleChange} className="w-full p-3 border rounded-xl" placeholder="0" />
+                    <input type="number" min="0" name="base_salary" value={formData.base_salary} onChange={handleChange} className="w-full p-2.5 border rounded-xl" placeholder="0" />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">CNIC</label>
+                    <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">License Expiry</label>
+                    <input type="date" name="license_expiry" value={formData.license_expiry} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="flex-grow">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">status</label>
+                    <select name="status" value={formData.status} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white">
+                        <option value="Available">Available</option>
+                        <option value="On Trip">On Trip</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">License No</label>
+                    <input name="license_no" value={formData.license_no} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono uppercase" required />
                 </div>
             </div>
             <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">License No</label>
-                <input name="license_no" value={formData.license_no} onChange={handleChange} className="w-full p-3 border rounded-xl font-mono uppercase" required />
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
-                <select name="status" value={formData.status} onChange={handleChange} className="w-full p-3 border rounded-xl bg-white">
-                    <option value="Available">Available</option>
-                    <option value="On Trip">On Trip</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Internal Remarks</label>
+                <textarea
+                    name="internal_remarks"
+                    value={formData.internal_remarks}
+                    onChange={e => setFormData({ ...formData, internal_remarks: e.target.value })}
+                    className="w-full p-2.5 border rounded-xl bg-slate-50"
+                    placeholder="E.g. Senior driver, prefers long routes..."
+                    rows={3}
+                />
             </div>
 
             <button
                 onClick={() => onSave({ ...formData, base_salary: Number(formData.base_salary) })}
                 disabled={!formData.name || !formData.license_no}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 mt-4"
+                className="w-full bg-blue-600 cursor-pointer text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 mt-4"
             >
                 {initialData.id ? 'Update Driver' : 'Register Driver'}
             </button>

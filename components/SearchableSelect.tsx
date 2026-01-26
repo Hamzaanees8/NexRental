@@ -39,7 +39,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
     return (
         <div className={`relative ${className}`} ref={wrapperRef}>
             <div
-                className="w-full p-4 border rounded-xl bg-slate-50 focus:bg-white transition cursor-pointer flex justify-between items-center"
+                className="w-full p-2 border rounded-lg bg-slate-50 focus:bg-white transition cursor-pointer flex justify-between items-center"
                 onClick={() => setIsOpen(!isOpen)}
                 tabIndex={0}
             >
@@ -50,7 +50,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
             </div>
 
             {isOpen && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                     <div className="p-2 sticky top-0 bg-white border-b">
                         <input
                             type="text"

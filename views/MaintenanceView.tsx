@@ -58,14 +58,14 @@ const MaintenanceView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm px-4 rounded-lg">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Maintenance</h1>
           <p className="text-sm text-slate-500">Track vehicle expenses and repairs</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="w-full sm:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
+          className="w-full sm:w-auto bg-blue-600 cursor-pointer text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
         >
           <PlusIcon className="mr-2" /> Add Record
         </button>
@@ -116,10 +116,10 @@ const MaintenanceView: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
               <h2 className="text-lg font-bold">Add Service Record</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none">&times;</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none cursor-pointer rounded-lg p-1 hover:bg-slate-200 transition">&times;</button>
             </div>
             <div className="p-6">
               <MaintenanceForm
@@ -143,20 +143,21 @@ const MaintenanceForm: React.FC<{
     vehicle_id: vehicles.length > 0 ? vehicles[0].id : '',
     type: MaintenanceType.Fuel,
     cost: 0,
+    odometer: 0,
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'cost' ? parseFloat(value) : value }));
+    setFormData(prev => ({ ...prev, [name]: (name === 'cost' || name === 'odometer') ? Math.max(0, parseFloat(value) || 0) : value }));
   };
 
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">Vehicle</label>
-        <select name="vehicle_id" value={formData.vehicle_id} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition">
+        <select name="vehicle_id" value={formData.vehicle_id} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition">
           {vehicles.map(v => <option key={v.id} value={v.id}>{v.license_plate} ({v.type})</option>)}
         </select>
       </div>
@@ -164,27 +165,33 @@ const MaintenanceForm: React.FC<{
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-1">Type</label>
-          <select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition">
+          <select name="type" value={formData.type} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition">
             {EXPENSE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-1">Cost</label>
-          <input type="number" name="cost" step="0.01" value={formData.cost} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition font-mono" required placeholder="0.00" />
+          <input type="number" name="cost" min="0" step="0.01" value={formData.cost} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition font-mono" required placeholder="0.00" />
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-bold text-slate-700 mb-1">Date</label>
-        <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition" required />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-1">Odometer Reading</label>
+          <input type="number" name="odometer" min="0" value={formData.odometer} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition font-mono" placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-1">Date</label>
+          <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" required />
+        </div>
       </div>
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">Notes / Description</label>
-        <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3} className="w-full p-3 border rounded-xl bg-slate-50 focus:bg-white transition" />
+        <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" />
       </div>
 
       <div className="pt-4">
-        <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition">
+        <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition cursor-pointer">
           Log Record
         </button>
       </div>

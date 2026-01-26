@@ -16,6 +16,12 @@ export interface Vehicle {
   last_maintenance_date: string; // ISO date string
   m_tag_balance?: number; // Pre-paid toll wallet balance
   current_odometer?: number; // Latest mileage reading
+  
+  // New Fields
+  make_model?: string;
+  year?: number;
+  insurance_expiry?: string; // ISO date string
+  token_tax_expiry?: string;  // ISO date string
 }
 
 export interface Customer {
@@ -27,6 +33,7 @@ export interface Customer {
   cnic?: string;
   license_number?: string;
   address?: string;
+  internal_remarks?: string;
 }
 
 export interface Driver {
@@ -35,8 +42,11 @@ export interface Driver {
   name: string;
   phone: string;
   license_no: string;
+  cnic?: string;
+  license_expiry?: string; // ISO date string
   status: 'Available' | 'On Trip' | 'Inactive';
   base_salary?: number;
+  internal_remarks?: string;
 }
 
 export enum TripStatus {
@@ -102,6 +112,9 @@ export interface Rental {
   security_deposit?: number; // Refundable
 
   inspection_notes?: string;
+  pickup_location?: string;
+  destination?: string;
+  self_drive_name?: string;
 
   // Expenses incurred during this specific rental
   fuel_cost?: number;
@@ -133,14 +146,15 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   description: string;
-  date: string; // For single-day transactions or start date of a hire
+  date: string;       // Main transaction date (NOT NULL in DB)
+  start_date?: string; // Range start
+  end_date?: string;   // Range end
   trip_id?: string;
   vehicle_id?: string;
   rental_id?: string;
 
   // Private Hire specific fields
-  contract_type?: ContractType; // matches DB field name if snake case
-  endDate?: string; // This one might be jsonb or missing in DB, let's keep it camel if inconsistent, but likely snake.
+  contract_type?: ContractType; 
 }
 
 export enum MaintenanceType {
@@ -158,6 +172,7 @@ export interface MaintenanceRecord {
   vehicle_id: string;
   type: MaintenanceType;
   cost: number;
+  odometer?: number;
   date: string; // ISO date string
   notes: string;
 }
