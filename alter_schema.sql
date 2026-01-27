@@ -58,6 +58,12 @@ CREATE TABLE rentals (
     destination TEXT,
     self_drive_name TEXT,
     self_drive_license TEXT,
+    self_drive_cnic TEXT,
+    self_drive_phone TEXT,
+    guarantor_name TEXT,
+    guarantor_info TEXT,
+    amount_type TEXT DEFAULT 'Fixed Price',
+    ride_expenses JSONB DEFAULT '[]',
     
     -- Expenses
     fuel_cost DECIMAL DEFAULT 0,
@@ -77,3 +83,12 @@ ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS contract_type TEXT; 
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES vehicles(id);
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS start_date DATE;
 ALTER TABLE financial_transactions ADD COLUMN IF NOT EXISTS end_date DATE;
+
+-- 7. Create Settings Table
+CREATE TABLE IF NOT EXISTS settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id TEXT NOT NULL UNIQUE,
+    locations JSONB DEFAULT '[]',
+    per_km_cost DECIMAL DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

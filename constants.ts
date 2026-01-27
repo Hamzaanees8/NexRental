@@ -5,6 +5,7 @@ export const TENANT_ID = 'tgpmimpzlunsjtxdjikw';
 export const VEHICLE_TYPES = ['Bus', 'Van', 'Minibus', 'Coach', 'Car', 'SUV'];
 export const TRIP_TERMINALS = ['Lahore', 'Sargodha', 'Islamabad', 'Multan', 'Karachi'];
 export const EXPENSE_TYPES = Object.values(MaintenanceType);
+export const RIDE_EXPENSE_TYPES = ['Fuel', 'Toll', 'Driver Allowance', 'Cleaning', 'Repair', 'Parking', 'Other'];
 
 export const STATUS_COLORS: { [key in VehicleStatus | TripStatus]: string } = {
     [VehicleStatus.Active]: 'bg-green-100 text-green-800',

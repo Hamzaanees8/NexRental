@@ -10,8 +10,9 @@ import { MenuIcon, LogoIcon } from './components/icons';
 
 import CustomersView from './views/CustomersView';
 import DriversView from './views/DriversView';
+import SettingsView from './views/SettingsView';
 
-type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'drivers';
+type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'drivers' | 'settings';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -35,6 +36,8 @@ const App: React.FC = () => {
         return <CustomersView />;
       case 'drivers':
         return <DriversView />;
+      case 'settings':
+        return <SettingsView />;
       default:
         return <DashboardView />;
     }

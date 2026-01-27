@@ -44,6 +44,12 @@ CREATE TABLE rentals (
     destination TEXT,
     self_drive_name TEXT,
     self_drive_license TEXT,
+    self_drive_cnic TEXT,
+    self_drive_phone TEXT,
+    guarantor_name TEXT,
+    guarantor_info TEXT,
+    amount_type TEXT DEFAULT 'Fixed Price',
+    ride_expenses JSONB DEFAULT '[]',
     total_rent DECIMAL,
     transaction_id UUID, -- This will be a foreign key to financial_transactions, but we'll add the constraint later to avoid circular dependency
     tenant_id TEXT
@@ -71,3 +77,12 @@ ALTER TABLE rentals
 ADD CONSTRAINT fk_financial_transactions
 FOREIGN KEY (transaction_id)
 REFERENCES financial_transactions(id);
+
+-- Create settings table
+CREATE TABLE IF NOT EXISTS settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id TEXT NOT NULL UNIQUE,
+    locations JSONB DEFAULT '[]',
+    per_km_cost DECIMAL DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

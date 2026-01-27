@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType } from '../types';
+import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType } from '../types';
 import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental } from '../services/api';
-import { formatCurrency } from '../constants';
+import { formatCurrency, RIDE_EXPENSE_TYPES } from '../constants';
 import { PlusIcon } from '../components/icons';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -32,6 +32,12 @@ const RentalsView: React.FC = () => {
         destination: '',
         self_drive_name: '',
         self_drive_license: '',
+        self_drive_cnic: '',
+        self_drive_phone: '',
+        guarantor_name: '',
+        guarantor_info: '',
+        amount_type: ContractType.FixedPrice,
+        ride_expenses: [],
         inspection_notes: ''
     });
 
@@ -112,6 +118,7 @@ const RentalsView: React.FC = () => {
             ...rental,
             start_time: new Date(rental.start_time).toISOString().slice(0, 16),
             end_time: new Date(rental.end_time).toISOString().slice(0, 16),
+            ride_expenses: rental.ride_expenses || []
         });
         setViewMode('create');
     }
@@ -134,10 +141,38 @@ const RentalsView: React.FC = () => {
             destination: '',
             self_drive_name: '',
             self_drive_license: '',
+            self_drive_cnic: '',
+            self_drive_phone: '',
+            guarantor_name: '',
+            guarantor_info: '',
+            amount_type: ContractType.FixedPrice,
+            ride_expenses: [],
             inspection_notes: ''
         });
         setViewMode('create');
     }
+
+    const handleAddExpense = () => {
+        setFormData(prev => ({
+            ...prev,
+            ride_expenses: [...(prev.ride_expenses || []), { type: RIDE_EXPENSE_TYPES[0], amount: 0 }]
+        }));
+    };
+
+    const handleRemoveExpense = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            ride_expenses: (prev.ride_expenses || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleExpenseChange = (index: number, field: 'type' | 'amount', value: any) => {
+        setFormData(prev => {
+            const updated = [...(prev.ride_expenses || [])];
+            updated[index] = { ...updated[index], [field]: value };
+            return { ...prev, ride_expenses: updated };
+        });
+    };
 
     if (loading) return <div className="p-4 text-center">Loading Rentals...</div>;
 
@@ -211,7 +246,12 @@ const RentalsView: React.FC = () => {
                                     </div>
                                     <div className="flex flex-col text-right">
                                         <span className="text-xs text-slate-400">Rent</span>
-                                        <span className="font-mono font-bold text-blue-600">{formatCurrency(rental.rent_amount)}</span>
+                                        <span className="font-mono font-bold text-blue-600">
+                                            {formatCurrency(rental.rent_amount)}
+                                            <span className="text-[10px] ml-1 text-slate-400 font-sans uppercase">
+                                                {rental.amount_type === ContractType.PerDay ? '/ day' : 'fixed'}
+                                            </span>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -296,26 +336,76 @@ const RentalsView: React.FC = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-orange-800 mb-1">Self Driver Name (Optional)</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter driver name..."
-                                        className="w-full p-2 border rounded-xl bg-white shadow-sm"
-                                        value={formData.self_drive_name || ''}
-                                        onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-orange-800 mb-1">Driver License No.</label>
-                                    <input
-                                        type="text"
-                                        placeholder="License / CNIC No."
-                                        className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono uppercase"
-                                        value={formData.self_drive_license || ''}
-                                        onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })}
-                                    />
+                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-orange-800 mb-1">Self Driver Name (Optional)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter driver name..."
+                                                className="w-full p-2 border rounded-xl bg-white shadow-sm font-medium"
+                                                value={formData.self_drive_name || ''}
+                                                onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-orange-800 mb-1">Driver Phone</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Phone Number"
+                                                className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono"
+                                                value={formData.self_drive_phone || ''}
+                                                onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs font-bold text-orange-400 uppercase mb-1">License No.</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="LHR-123"
+                                                    className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono uppercase text-sm"
+                                                    value={formData.self_drive_license || ''}
+                                                    onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-orange-400 uppercase mb-1">CNIC No.</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="35201-..."
+                                                    className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono text-sm"
+                                                    value={formData.self_drive_cnic || ''}
+                                                    onChange={e => setFormData({ ...formData, self_drive_cnic: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/50 p-4 rounded-xl border border-orange-200/50 space-y-4">
+                                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest border-b border-orange-200 pb-1">Guarantor Verification</p>
+                                        <div>
+                                            <label className="block text-sm font-bold text-orange-800 mb-1">Name</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Guarantor name"
+                                                className="w-full p-2 border rounded-xl bg-white shadow-sm"
+                                                value={formData.guarantor_name || ''}
+                                                onChange={e => setFormData({ ...formData, guarantor_name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-orange-800 mb-1">CNIC / License</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Identity details"
+                                                className="w-full p-2 border rounded-xl bg-white shadow-sm"
+                                                value={formData.guarantor_info || ''}
+                                                onChange={e => setFormData({ ...formData, guarantor_info: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -368,6 +458,84 @@ const RentalsView: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Ride Expenses Section */}
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <label className="block text-sm font-bold text-slate-700">Ride Expenses</label>
+                                <button
+                                    type="button"
+                                    onClick={handleAddExpense}
+                                    className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-bold transition flex items-center gap-1"
+                                >
+                                    <PlusIcon /> Add Expense
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                {(formData.ride_expenses || []).map((expense, index) => {
+                                    const isStandardType = RIDE_EXPENSE_TYPES.includes(expense.type) && expense.type !== 'Other';
+                                    return (
+                                        <div key={index} className="flex gap-2 items-end p-3 bg-slate-50 rounded-xl border border-slate-100 relative group">
+                                            <div className="flex-1 space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Expense Type</label>
+                                                <div className="flex flex-col gap-2">
+                                                    <select
+                                                        className="w-full p-2 border rounded-lg bg-white text-sm"
+                                                        value={isStandardType ? expense.type : 'Other'}
+                                                        onChange={e => handleExpenseChange(index, 'type', e.target.value)}
+                                                    >
+                                                        {RIDE_EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
+
+                                                    {(!isStandardType || expense.type === 'Other') && (
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Describe custom expense..."
+                                                            className="w-full p-2 border rounded-lg bg-white text-sm"
+                                                            value={expense.type === 'Other' ? '' : expense.type}
+                                                            onChange={e => handleExpenseChange(index, 'type', e.target.value)}
+                                                            autoFocus={expense.type === 'Other'}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="w-32 space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Amount</label>
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    className="w-full p-2 border rounded-lg bg-white text-sm font-mono"
+                                                    value={expense.amount || ''}
+                                                    onChange={e => handleExpenseChange(index, 'amount', Math.max(0, parseInt(e.target.value) || 0))}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveExpense(index)}
+                                                className="p-2 text-slate-400 hover:text-red-500 transition mb-0.5"
+                                            >
+                                                &times;
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+
+                                {(formData.ride_expenses || []).length > 0 && (
+                                    <div className="flex justify-end px-3 py-1 mt-1">
+                                        <p className="text-xs font-bold text-slate-500">
+                                            Total: <span className="text-slate-800 font-mono text-sm ml-1">
+                                                {formatCurrency((formData.ride_expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0))}
+                                            </span>
+                                        </p>
+                                    </div>
+                                )}
+
+                                {(formData.ride_expenses || []).length === 0 && (
+                                    <p className="text-center py-4 text-xs text-slate-400 italic bg-slate-50/50 rounded-xl border border-dashed">No expenses added yet.</p>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Dates */}
                         <div className="grid grid-cols-2 gap-6">
                             <div>
@@ -388,11 +556,23 @@ const RentalsView: React.FC = () => {
 
                         {/* Financials */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">Total Rent Amount</label>
-                            <input type="number" min="0" className="w-full p-2 border rounded-xl font-mono text-xl" placeholder="0.00"
-                                value={formData.rent_amount}
-                                onChange={e => setFormData({ ...formData, rent_amount: Math.max(0, Number(e.target.value)) })}
-                            />
+                            <label className="block text-sm font-bold text-slate-700 mb-2">
+                                {formData.amount_type === ContractType.PerDay ? 'Rent Rate / Day' : 'Total Rent Amount'}
+                            </label>
+                            <div className="flex gap-2">
+                                <select
+                                    className="w-1/3 p-2 border rounded-xl bg-slate-50 text-sm font-medium"
+                                    value={formData.amount_type}
+                                    onChange={e => setFormData({ ...formData, amount_type: e.target.value as ContractType })}
+                                >
+                                    <option value={ContractType.FixedPrice}>Fixed Price</option>
+                                    <option value={ContractType.PerDay}>Per Day</option>
+                                </select>
+                                <input type="number" min="0" className="w-2/3 p-2 border rounded-xl font-mono text-xl" placeholder="0.00"
+                                    value={formData.rent_amount}
+                                    onChange={e => setFormData({ ...formData, rent_amount: Math.max(0, Number(e.target.value)) })}
+                                />
+                            </div>
                         </div>
 
                         {/* Status (Only for edit) */}

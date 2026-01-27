@@ -93,6 +93,11 @@ export enum RentalStatus {
   Cancelled = 'Cancelled'
 }
 
+export interface RideExpense {
+  type: string;
+  amount: number;
+}
+
 export interface Rental {
   id: string;
   tenant_id: string;
@@ -116,12 +121,18 @@ export interface Rental {
   destination?: string;
   self_drive_name?: string;
   self_drive_license?: string;
+  self_drive_cnic?: string;
+  self_drive_phone?: string;
+  guarantor_name?: string;
+  guarantor_info?: string;
+  amount_type?: ContractType;
 
   // Expenses incurred during this specific rental
   fuel_cost?: number;
   toll_cost?: number;
   driver_allowance?: number;
   other_expenses?: number;
+  ride_expenses?: RideExpense[];
 
   total_cost?: number; // Sum of expenses
   net_profit?: number; // rent_amount - total_cost
@@ -183,4 +194,11 @@ export interface FinancialSummary {
   totalCosts: number;
   netProfit: number;
   dailyData: { date: string; revenue: number; costs: number; profit: number }[];
+}
+
+export interface AppSettings {
+  id: string;
+  tenant_id: string;
+  locations: string[];
+  per_km_cost: number;
 }

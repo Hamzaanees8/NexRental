@@ -11,6 +11,7 @@ import {
   Voucher,
   PassengerLog,
   ContractType,
+  AppSettings,
 } from "../types";
 import { TENANT_ID } from "../constants";
 import { supabase } from "./supabaseClient";
@@ -597,4 +598,38 @@ export const topUpMTag = async (
   ]);
 
   return updatedVehicle as Vehicle;
+};
+
+// Settings
+export const getSettings = async (): Promise<AppSettings | null> => {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("tenant_id", TENANT_ID)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+  return data as AppSettings | null;
+};
+
+export const updateSettings = async (settings: Partial<AppSettings>): Promise<AppSettings> => {
+  // Check if exists
+  const existing = await getSettings();
+  
+  if (existing) {
+    const { data, error } = await supabase
+      .from("settings")
+      .update(settings)
+      .eq("tenant_id", TENANT_ID)
+      .select();
+    if (error) throw new Error(error.message);
+    return data[0] as AppSettings;
+  } else {
+    const { data, error } = await supabase
+      .from("settings")
+      .insert([{ ...settings, tenant_id: TENANT_ID }])
+      .select();
+    if (error) throw new Error(error.message);
+    return data[0] as AppSettings;
+  }
 };
