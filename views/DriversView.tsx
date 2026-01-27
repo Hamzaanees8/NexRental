@@ -81,7 +81,7 @@ const DriversView: React.FC = () => {
                 </div>
                 <button
                     onClick={openCreateModal}
-                    className="w-full sm:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
+                    className="w-full sm:w-auto bg-blue-600 cursor-pointer text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
                 >
                     <PlusIcon className="mr-2" /> Add Driver
                 </button>

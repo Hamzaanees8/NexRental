@@ -302,7 +302,18 @@ const VehicleForm: React.FC<{
   };
 
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const cleanedData = {
+          ...formData,
+          insurance_expiry: formData.insurance_expiry || null,
+          token_tax_expiry: formData.token_tax_expiry || null,
+        };
+        onSave(cleanedData);
+      }}
+      className="space-y-4 max-h-[70vh] overflow-y-auto"
+    >
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">License Plate</label>
         <input type="text" name="license_plate" value={formData.license_plate} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" required />
@@ -352,12 +363,12 @@ const VehicleForm: React.FC<{
         </div>
       )}
       <div className="pt-4">
-        <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition cursor-pointer">
+        <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition cursor-pointer">
           {vehicle ? 'Save Changes' : 'Create Vehicle'}
         </button>
       </div>
-    </div>
+    </form>
   );
-}
+};
 
 export default FleetView;

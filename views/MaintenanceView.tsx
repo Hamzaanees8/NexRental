@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMaintenanceHistory, createMaintenanceRecord, getVehicles } from '../services/api';
+import { getMaintenanceHistory, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord, getVehicles } from '../services/api';
 import { MaintenanceRecord, Vehicle, MaintenanceType } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -17,8 +17,7 @@ const MaintenanceView: React.FC = () => {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // ... fetch logic
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
 
   const fetchMaintenanceData = async () => {
     setLoading(true);
@@ -37,16 +36,43 @@ const MaintenanceView: React.FC = () => {
     fetchMaintenanceData();
   }, []);
 
-  const handleSaveRecord = async (formData: Omit<MaintenanceRecord, 'id' | 'tenant_id'>) => {
-    await createMaintenanceRecord(formData);
-    fetchMaintenanceData();
+  const handleOpenModal = (record?: MaintenanceRecord) => {
+    setSelectedRecord(record || null);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedRecord(null);
     setIsModalOpen(false);
+  };
+
+  const handleSaveRecord = async (formData: Omit<MaintenanceRecord, 'id' | 'tenant_id'>) => {
+    try {
+      if (selectedRecord) {
+        await updateMaintenanceRecord(selectedRecord.id, formData);
+      } else {
+        await createMaintenanceRecord(formData);
+      }
+      fetchMaintenanceData();
+      handleCloseModal();
+    } catch (error) {
+      alert("Failed to save record");
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    try {
+      await deleteMaintenanceRecord(id);
+      fetchMaintenanceData();
+    } catch (error) {
+      alert("Failed to delete record");
+    }
   };
 
   const filteredRecords = records.filter(r => {
     const v = vehicles.find(veh => veh.id === r.vehicle_id);
     const search = searchTerm.toLowerCase();
-    // Match against vehicle label, type or notes
     const vehicleMatch = v?.license_plate.toLowerCase().includes(search);
     const typeMatch = r.type.toLowerCase().includes(search);
     const notesMatch = r.notes?.toLowerCase()?.includes(search);
@@ -64,7 +90,7 @@ const MaintenanceView: React.FC = () => {
           <p className="text-sm text-slate-500">Track vehicle expenses and repairs</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className="w-full sm:w-auto bg-blue-600 cursor-pointer text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
         >
           <PlusIcon className="mr-2" /> Add Record
@@ -88,7 +114,23 @@ const MaintenanceView: React.FC = () => {
         {filteredRecords.map(r => {
           const vehicle = vehicles.find(v => v.id === r.vehicle_id);
           return (
-            <div key={r.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div key={r.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between relative group pt-8">
+              <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition px-2">
+                <button
+                  onClick={() => handleOpenModal(r)}
+                  className="p-1.5 cursor-pointer text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                  title="Edit"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => handleDeleteRecord(r.id)}
+                  className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  title="Delete"
+                >
+                  🗑
+                </button>
+              </div>
               <div>
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-slate-800">{vehicle?.license_plate || 'General'}</span>
@@ -112,17 +154,17 @@ const MaintenanceView: React.FC = () => {
         )}
       </div>
 
-
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white w-full max-w-lg rounded-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={handleCloseModal}>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
-              <h2 className="text-lg font-bold">Add Service Record</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none cursor-pointer rounded-lg p-1 hover:bg-slate-200 transition">&times;</button>
+              <h2 className="text-lg font-bold">{selectedRecord ? 'Edit Record' : 'Add Record'}</h2>
+              <button onClick={handleCloseModal} className="text-slate-500 hover:text-slate-800 text-2xl leading-none cursor-pointer rounded-lg p-1 hover:bg-slate-200 transition">&times;</button>
             </div>
             <div className="p-6">
               <MaintenanceForm
+                record={selectedRecord}
                 vehicles={vehicles}
                 onSave={handleSaveRecord}
               />
@@ -136,9 +178,10 @@ const MaintenanceView: React.FC = () => {
 
 // Refactored Form
 const MaintenanceForm: React.FC<{
+  record: MaintenanceRecord | null,
   vehicles: Vehicle[],
   onSave: (data: any) => void
-}> = ({ vehicles, onSave }) => {
+}> = ({ record, vehicles, onSave }) => {
   const [formData, setFormData] = useState({
     vehicle_id: vehicles.length > 0 ? vehicles[0].id : '',
     type: MaintenanceType.Fuel,
@@ -147,6 +190,19 @@ const MaintenanceForm: React.FC<{
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
+
+  useEffect(() => {
+    if (record) {
+      setFormData({
+        vehicle_id: record.vehicle_id,
+        type: record.type,
+        cost: record.cost,
+        odometer: record.odometer || 0,
+        date: new Date(record.date).toISOString().split('T')[0],
+        notes: record.notes || ''
+      });
+    }
+  }, [record]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -192,7 +248,7 @@ const MaintenanceForm: React.FC<{
 
       <div className="pt-4">
         <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition cursor-pointer">
-          Log Record
+          {record ? 'Save Changes' : 'Log Record'}
         </button>
       </div>
     </div>

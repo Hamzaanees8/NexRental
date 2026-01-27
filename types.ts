@@ -115,6 +115,7 @@ export interface Rental {
   pickup_location?: string;
   destination?: string;
   self_drive_name?: string;
+  self_drive_license?: string;
 
   // Expenses incurred during this specific rental
   fuel_cost?: number;

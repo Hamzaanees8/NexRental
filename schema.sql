@@ -40,6 +40,10 @@ CREATE TABLE rentals (
     status TEXT NOT NULL,
     rental_type TEXT,
     rental_scope TEXT,
+    pickup_location TEXT,
+    destination TEXT,
+    self_drive_name TEXT,
+    self_drive_license TEXT,
     total_rent DECIMAL,
     transaction_id UUID, -- This will be a foreign key to financial_transactions, but we'll add the constraint later to avoid circular dependency
     tenant_id TEXT

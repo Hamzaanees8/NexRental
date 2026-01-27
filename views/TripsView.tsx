@@ -65,54 +65,107 @@ const TripsView: React.FC = () => {
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-slate-800">Trip Management</h1>
-        <Button onClick={handleOpenTripModal}>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Trip Management</h1>
+        <Button onClick={handleOpenTripModal} className="w-full sm:w-auto">
           <PlusIcon />
           <span className="ml-2">Schedule Trip</span>
         </Button>
       </div>
+
       {loading ? (
-        <p>Loading trips...</p>
+        <div className="p-8 text-center text-slate-500 animate-pulse">Loading trips...</div>
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Date</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Route</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Vehicle</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Departure</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider text-right">Revenue</th>
-                  <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {trips.map((trip) => (
-                  <tr key={trip.id}>
-                    <td className="p-4 text-slate-700">{new Date(trip.date).toLocaleDateString()}</td>
-                    <td className="p-4 font-medium text-slate-800">{trip.route.join(' → ')}</td>
-                    <td className="p-4 text-slate-700">{vehicles.find(v => v.id === trip.vehicle_id)?.licensePlate || 'N/A'}</td>
-                    <td className="p-4 text-slate-700">{trip.departureTime}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[trip.status]}`}>
-                        {trip.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right font-mono text-green-700">{formatCurrency(trip.voucher?.totalRevenue || 0)}</td>
-                    <td className="p-4 space-x-2">
-                      {trip.status === TripStatus.Scheduled && <Button size="sm" onClick={() => handleUpdateStatus(trip.id, TripStatus.EnRoute)}>Start</Button>}
-                      <Button variant="secondary" size="sm" onClick={() => handleOpenVoucherModal(trip)}>Voucher</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Route</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Vehicle</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Departure</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider text-right">Revenue</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {trips.map((trip) => (
+                      <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 text-slate-700">{new Date(trip.date).toLocaleDateString()}</td>
+                        <td className="p-4 font-medium text-slate-800">{trip.route.join(' → ')}</td>
+                        <td className="p-4 text-slate-700">{vehicles.find(v => v.id === trip.vehicle_id)?.license_plate || 'N/A'}</td>
+                        <td className="p-4 text-slate-700">{trip.departureTime}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[trip.status]}`}>
+                            {trip.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right font-mono text-green-700">{formatCurrency(trip.voucher?.totalRevenue || 0)}</td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            {trip.status === TripStatus.Scheduled && <Button size="sm" onClick={() => handleUpdateStatus(trip.id, TripStatus.EnRoute)}>Start</Button>}
+                            <Button variant="secondary" size="sm" onClick={() => handleOpenVoucherModal(trip)}>Voucher</Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </div>
-        </Card>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {trips.map((trip) => (
+              <div key={trip.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="text-xs text-slate-500">{new Date(trip.date).toLocaleDateString()}</p>
+                    <h3 className="font-bold text-slate-800">{trip.route.join(' → ')}</h3>
+                  </div>
+                  <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded-full ${STATUS_COLORS[trip.status]}`}>
+                    {trip.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                  <div>
+                    <p className="text-xs text-slate-400">Vehicle</p>
+                    <p className="font-medium text-slate-700">{vehicles.find(v => v.id === trip.vehicle_id)?.license_plate || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Departure</p>
+                    <p className="font-medium text-slate-700">{trip.departureTime}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t">
+                  <div>
+                    <p className="text-xs text-slate-400">Revenue</p>
+                    <p className="font-mono font-bold text-green-700">{formatCurrency(trip.voucher?.totalRevenue || 0)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {trip.status === TripStatus.Scheduled && <Button size="sm" onClick={() => handleUpdateStatus(trip.id, TripStatus.EnRoute)}>Start</Button>}
+                    <Button variant="secondary" size="sm" onClick={() => handleOpenVoucherModal(trip)}>Voucher</Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {trips.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <p>No trips found. Schedule a trip to get started.</p>
+            </div>
+          )}
+        </>
       )}
       <TripFormModal
         isOpen={isTripModalOpen}

@@ -54,6 +54,10 @@ CREATE TABLE rentals (
     security_deposit DECIMAL DEFAULT 0,
     
     inspection_notes TEXT,
+    pickup_location TEXT,
+    destination TEXT,
+    self_drive_name TEXT,
+    self_drive_license TEXT,
     
     -- Expenses
     fuel_cost DECIMAL DEFAULT 0,

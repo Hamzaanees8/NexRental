@@ -100,21 +100,21 @@ const FinancialsView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-20">
       {/* Header */}
-      <div className="flex flex-col px-4 rounded-lg sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm px-4 rounded-lg">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">Financials</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Financials</h1>
           <p className="text-sm text-slate-500">Overview of income and expenses</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-[250px]">
+        <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => { setEditingTransaction(null); setIsPrivateHireModalOpen(true); }}
-            className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg shadow hover:bg-indigo-700 font-bold text-sm cursor-pointer transition"
+            className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-700 font-bold text-sm cursor-pointer transition whitespace-nowrap"
           >
             + Income
           </button>
           <button
             onClick={() => { setEditingTransaction(null); setIsExpenseModalOpen(true); }}
-            className="flex-1 bg-pink-600 text-white px-4 py-3 rounded-lg shadow hover:bg-pink-700 font-bold text-sm cursor-pointer transition"
+            className="flex-1 sm:flex-none bg-pink-600 text-white px-6 py-3 rounded-lg shadow hover:bg-pink-700 font-bold text-sm cursor-pointer transition whitespace-nowrap"
           >
             - Expense
           </button>
@@ -122,7 +122,7 @@ const FinancialsView: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-4 sm:px-0">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
           <p className="text-xs text-slate-500 uppercase font-bold">Income</p>
           <p className="text-lg sm:text-2xl font-mono font-bold text-green-600">{formatCurrency(totalRevenue)}</p>

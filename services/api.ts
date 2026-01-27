@@ -266,6 +266,27 @@ export const getMaintenanceHistory = async (): Promise<MaintenanceRecord[]> => {
   return data as MaintenanceRecord[];
 };
 
+export const updateMaintenanceRecord = async (
+  id: string,
+  updates: Partial<MaintenanceRecord>
+): Promise<MaintenanceRecord> => {
+  const { data, error } = await supabase
+    .from("maintenance_records")
+    .update(updates)
+    .eq("id", id)
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0] as MaintenanceRecord;
+};
+
+export const deleteMaintenanceRecord = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from("maintenance_records")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+};
+
 export const createMaintenanceRecord = async (
   recordData: Omit<MaintenanceRecord, "id" | "tenant_id">
 ): Promise<MaintenanceRecord> => {

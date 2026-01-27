@@ -31,6 +31,7 @@ const RentalsView: React.FC = () => {
         pickup_location: '',
         destination: '',
         self_drive_name: '',
+        self_drive_license: '',
         inspection_notes: ''
     });
 
@@ -132,6 +133,7 @@ const RentalsView: React.FC = () => {
             pickup_location: '',
             destination: '',
             self_drive_name: '',
+            self_drive_license: '',
             inspection_notes: ''
         });
         setViewMode('create');
@@ -148,7 +150,7 @@ const RentalsView: React.FC = () => {
                 {viewMode === 'list' && (
                     <button
                         onClick={openCreate}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition font-bold"
+                        className="bg-blue-600 cursor-pointer text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition font-bold"
                     >
                         + New Rental
                     </button>
@@ -203,6 +205,9 @@ const RentalsView: React.FC = () => {
                                     <div className="flex flex-col">
                                         <span className="text-xs text-slate-400">Type</span>
                                         <span className="font-medium text-slate-700">{isWithDriver ? 'With Driver' : 'Self Drive'}</span>
+                                        {!isWithDriver && rental.self_drive_license && (
+                                            <span className="text-[10px] text-slate-400 font-mono">Lic: {rental.self_drive_license}</span>
+                                        )}
                                     </div>
                                     <div className="flex flex-col text-right">
                                         <span className="text-xs text-slate-400">Rent</span>
@@ -276,26 +281,24 @@ const RentalsView: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Conditional Fields based on Rental Type */}
-                        <div className="grid md:grid-cols-2 gap-6">
-                            {formData.rental_type === RentalType.WithDriver ? (
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <label className="block text-sm font-bold text-blue-800 mb-2">Assign Driver</label>
-                                    <SearchableSelect
-                                        options={availableDrivers.map(d => ({
-                                            value: d.id,
-                                            label: `${d.name} (${d.status})`
-                                        }))}
-                                        value={formData.driver_id || ''}
-                                        onChange={(val) => setFormData({ ...formData, driver_id: val })}
-                                        placeholder="Search Driver..."
-                                        className="bg-white"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                                    <label className="block text-sm font-bold text-orange-800 mb-2">Self Driver Name (Optional)</label>
+                        {formData.rental_type === RentalType.WithDriver ? (
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                <label className="block text-sm font-bold text-blue-800 mb-2">Assign Driver</label>
+                                <SearchableSelect
+                                    options={availableDrivers.map(d => ({
+                                        value: d.id,
+                                        label: `${d.name} (${d.status})`
+                                    }))}
+                                    value={formData.driver_id || ''}
+                                    onChange={(val) => setFormData({ ...formData, driver_id: val })}
+                                    placeholder="Search Driver..."
+                                    className="bg-white"
+                                />
+                            </div>
+                        ) : (
+                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-orange-800 mb-1">Self Driver Name (Optional)</label>
                                     <input
                                         type="text"
                                         placeholder="Enter driver name..."
@@ -304,8 +307,20 @@ const RentalsView: React.FC = () => {
                                         onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })}
                                     />
                                 </div>
-                            )}
-
+                                <div>
+                                    <label className="block text-sm font-bold text-orange-800 mb-1">Driver License No.</label>
+                                    <input
+                                        type="text"
+                                        placeholder="License / CNIC No."
+                                        className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono uppercase"
+                                        value={formData.self_drive_license || ''}
+                                        onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {/* Conditional Fields based on Rental Type */}
+                        <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-2">Start Location</label>
                                 <input
