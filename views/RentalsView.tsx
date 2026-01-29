@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType } from '../types';
+import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType, CustomerSource } from '../types';
 import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental } from '../services/api';
 import { formatCurrency, RIDE_EXPENSE_TYPES } from '../constants';
 import { PlusIcon } from '../components/icons';
@@ -17,7 +17,7 @@ const RentalsView: React.FC = () => {
 
     // Form State
     const [formData, setFormData] = useState<Partial<Rental>>({
-        rental_type: RentalType.WithDriver, // Default as requested
+        rental_type: RentalType.WithDriver,
         start_time: new Date().toISOString().slice(0, 16),
         end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
         rent_amount: 0,
@@ -36,14 +36,23 @@ const RentalsView: React.FC = () => {
         self_drive_phone: '',
         guarantor_name: '',
         guarantor_info: '',
+        guarantor_cnic: '',
+        guarantor_phone: '',
         amount_type: ContractType.FixedPrice,
         ride_expenses: [],
-        inspection_notes: ''
+        inspection_notes: '',
+        commission_amount: 0
     });
 
     // Quick Customer Modal
     const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
-    const [quickCustomer, setQuickCustomer] = useState({ name: '', phone: '' });
+    const [quickCustomer, setQuickCustomer] = useState({
+        name: '',
+        phone: '',
+        source: CustomerSource.Direct,
+        reference_name: '',
+        reference_phone: ''
+    });
 
     useEffect(() => {
         loadData();
@@ -102,11 +111,17 @@ const RentalsView: React.FC = () => {
     const handleQuickCustomerSave = async () => {
         if (!quickCustomer.name || !quickCustomer.phone) return;
         try {
-            const newCust = await createCustomer({ ...quickCustomer, tenant_id: '' } as any); // API handles tenant_id
-            await loadData(); // Reload to get new customer list
-            setFormData(prev => ({ ...prev, customer_id: newCust.id })); // Auto select
+            const newCust = await createCustomer({ ...quickCustomer, tenant_id: '' } as any);
+            await loadData();
+            setFormData(prev => ({ ...prev, customer_id: newCust.id }));
             setIsQuickCustomerOpen(false);
-            setQuickCustomer({ name: '', phone: '' });
+            setQuickCustomer({
+                name: '',
+                phone: '',
+                source: CustomerSource.Direct,
+                reference_name: '',
+                reference_phone: ''
+            });
         } catch (e) {
             alert("Failed to create customer");
         }
@@ -145,9 +160,12 @@ const RentalsView: React.FC = () => {
             self_drive_phone: '',
             guarantor_name: '',
             guarantor_info: '',
+            guarantor_cnic: '',
+            guarantor_phone: '',
             amount_type: ContractType.FixedPrice,
             ride_expenses: [],
-            inspection_notes: ''
+            inspection_notes: '',
+            commission_amount: 0
         });
         setViewMode('create');
     }
@@ -176,11 +194,11 @@ const RentalsView: React.FC = () => {
 
     if (loading) return <div className="p-4 text-center">Loading Rentals...</div>;
 
-    const availableDrivers = drivers; // In real app, filter by availability based on status or date overlap
+    const availableDrivers = drivers.filter(d => d.status === 'Available' || d.id === formData.driver_id);
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto pb-20">
-            <header className="flex px-4 rounded-lg justify-between items-center sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+        <div className="space-y-6 max-w-5xl mx-auto pb-20 px-4">
+            <header className="flex justify-between items-center sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
                 <h1 className="text-2xl font-bold">Car Rentals</h1>
                 {viewMode === 'list' && (
                     <button
@@ -203,24 +221,18 @@ const RentalsView: React.FC = () => {
                         const isWithDriver = rental.rental_type === RentalType.WithDriver;
 
                         return (
-                            <div key={rental.id}
-                                className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition relative group pt-8"
-                            >
+                            <div key={rental.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition relative group pt-8">
                                 <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); openEdit(rental); }}
                                         className="p-1.5 cursor-pointer text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                                         title="Edit"
-                                    >
-                                        ✎
-                                    </button>
+                                    >✎</button>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleDelete(rental.id); }}
                                         className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                         title="Delete"
-                                    >
-                                        🗑
-                                    </button>
+                                    >🗑</button>
                                 </div>
                                 <div className="flex justify-between items-start mb-2">
                                     <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${rental.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
@@ -228,63 +240,55 @@ const RentalsView: React.FC = () => {
                                     </span>
                                     <span className="text-xs text-slate-500 font-mono">{new Date(rental.start_time).toLocaleDateString()}</span>
                                 </div>
-
                                 <h3 className="font-bold text-lg text-slate-800">{customer?.name || 'Unknown'}</h3>
-
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-sm font-mono bg-slate-100 px-1.5 rounded">{vehicle?.license_plate}</span>
                                     <span className="text-xs text-slate-500 uppercase">{vehicle?.type}</span>
                                 </div>
-
                                 <div className="mt-4 pt-3 border-t flex justify-between text-sm">
                                     <div className="flex flex-col">
                                         <span className="text-xs text-slate-400">Type</span>
                                         <span className="font-medium text-slate-700">{isWithDriver ? 'With Driver' : 'Self Drive'}</span>
-                                        {!isWithDriver && rental.self_drive_license && (
-                                            <span className="text-[10px] text-slate-400 font-mono">Lic: {rental.self_drive_license}</span>
+                                        {!isWithDriver && rental.guarantor_name && (
+                                            <span className="text-[10px] text-orange-600 font-bold italic mt-0.5">Gur: {rental.guarantor_name}</span>
                                         )}
                                     </div>
                                     <div className="flex flex-col text-right">
                                         <span className="text-xs text-slate-400">Rent</span>
                                         <span className="font-mono font-bold text-blue-600">
                                             {formatCurrency(rental.rent_amount)}
-                                            <span className="text-[10px] ml-1 text-slate-400 font-sans uppercase">
-                                                {rental.amount_type === ContractType.PerDay ? '/ day' : 'fixed'}
-                                            </span>
                                         </span>
+                                        {rental.commission_amount ? (
+                                            <span className="text-[10px] text-red-500 font-bold block">
+                                                Com: {formatCurrency(rental.commission_amount)}
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
                         )
                     })}
-                    {rentals.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">No rentals found. Create one to get started.</p>}
                 </div>
             )}
 
             {viewMode === 'create' && (
                 <div className="bg-white p-6 rounded-2xl shadow-xl max-w-2xl mx-auto border border-slate-100">
                     <h2 className="text-xl font-bold mb-6 text-slate-800">{selectedRental ? 'Edit Booking' : 'New Booking'}</h2>
-
                     <div className="space-y-6">
-                        {/* Driver Type Toggle */}
                         <div className="p-1 bg-slate-100 rounded-xl flex gap-1">
-                            {(['With Driver', 'Self Drive'] as const).map(type => {
-                                const val = type === 'With Driver' ? RentalType.WithDriver : RentalType.SelfDrive;
-                                return (
-                                    <button
-                                        key={type}
-                                        onClick={() => setFormData(prev => ({ ...prev, rental_type: val }))}
-                                        className={`flex-1 py-3 cursor-pointer text-sm font-bold rounded-lg transition ${formData.rental_type === val ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        {type}
-                                    </button>
-                                )
-                            })}
+                            {([RentalType.WithDriver, RentalType.SelfDrive]).map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => setFormData(prev => ({ ...prev, rental_type: type }))}
+                                    className={`flex-1 py-3 cursor-pointer text-sm font-bold rounded-lg transition ${formData.rental_type === type ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {type}
+                                </button>
+                            ))}
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-6">
-                            {/* Vehicle Selection with Search */}
-                            <div className="relative">
+                            <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-2">Select Vehicle</label>
                                 <SearchableSelect
                                     options={vehicles.filter(v => v.status === 'Active' || v.id === formData.vehicle_id).map(v => ({
@@ -296,39 +300,29 @@ const RentalsView: React.FC = () => {
                                     placeholder="Search Vehicle..."
                                 />
                             </div>
-
-                            {/* Customer Selection with Quick Add & Search */}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-2">Customer</label>
                                 <div className="flex gap-2">
                                     <div className="flex-1">
                                         <SearchableSelect
-                                            options={customers.map(c => ({
-                                                value: c.id,
-                                                label: c.name
-                                            }))}
+                                            options={customers.map(c => ({ value: c.id, label: c.name }))}
                                             value={formData.customer_id || ''}
                                             onChange={(val) => setFormData({ ...formData, customer_id: val })}
                                             placeholder="Search Customer..."
                                         />
                                     </div>
-                                    <button
-                                        onClick={() => setIsQuickCustomerOpen(true)}
-                                        className="bg-blue-100 text-blue-600 w-14 rounded-xl flex items-center justify-center hover:bg-blue-200 transition"
-                                    >
+                                    <button onClick={() => setIsQuickCustomerOpen(true)} className="bg-blue-100 text-blue-600 w-14 rounded-xl flex items-center justify-center hover:bg-blue-200 transition">
                                         <PlusIcon />
                                     </button>
                                 </div>
                             </div>
                         </div>
+
                         {formData.rental_type === RentalType.WithDriver ? (
                             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                                 <label className="block text-sm font-bold text-blue-800 mb-2">Assign Driver</label>
                                 <SearchableSelect
-                                    options={availableDrivers.map(d => ({
-                                        value: d.id,
-                                        label: `${d.name} (${d.status})`
-                                    }))}
+                                    options={availableDrivers.map(d => ({ value: d.id, label: `${d.name} (${d.status})` }))}
                                     value={formData.driver_id || ''}
                                     onChange={(val) => setFormData({ ...formData, driver_id: val })}
                                     placeholder="Search Driver..."
@@ -336,102 +330,29 @@ const RentalsView: React.FC = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-bold text-orange-800 mb-1">Self Driver Name (Optional)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Enter driver name..."
-                                                className="w-full p-2 border rounded-xl bg-white shadow-sm font-medium"
-                                                value={formData.self_drive_name || ''}
-                                                onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-orange-800 mb-1">Driver Phone</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Phone Number"
-                                                className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono"
-                                                value={formData.self_drive_phone || ''}
-                                                onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-xs font-bold text-orange-400 uppercase mb-1">License No.</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="LHR-123"
-                                                    className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono uppercase text-sm"
-                                                    value={formData.self_drive_license || ''}
-                                                    onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-orange-400 uppercase mb-1">CNIC No.</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="35201-..."
-                                                    className="w-full p-2 border rounded-xl bg-white shadow-sm font-mono text-sm"
-                                                    value={formData.self_drive_cnic || ''}
-                                                    onChange={e => setFormData({ ...formData, self_drive_cnic: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/50 p-4 rounded-xl border border-orange-200/50 space-y-4">
-                                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest border-b border-orange-200 pb-1">Guarantor Verification</p>
-                                        <div>
-                                            <label className="block text-sm font-bold text-orange-800 mb-1">Name</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Guarantor name"
-                                                className="w-full p-2 border rounded-xl bg-white shadow-sm"
-                                                value={formData.guarantor_name || ''}
-                                                onChange={e => setFormData({ ...formData, guarantor_name: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-orange-800 mb-1">CNIC / License</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Identity details"
-                                                className="w-full p-2 border rounded-xl bg-white shadow-sm"
-                                                value={formData.guarantor_info || ''}
-                                                onChange={e => setFormData({ ...formData, guarantor_info: e.target.value })}
-                                            />
-                                        </div>
+                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input placeholder="Driver Name" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_name || ''} onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })} />
+                                    <input placeholder="Driver Phone" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_phone || ''} onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input placeholder="License No" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_license || ''} onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })} />
+                                    <input placeholder="CNIC No" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_cnic || ''} onChange={e => setFormData({ ...formData, self_drive_cnic: e.target.value })} />
+                                </div>
+                                <div className="pt-2 border-t border-orange-200">
+                                    <p className="text-[10px] font-bold text-orange-600 uppercase mb-2 tracking-wider">Guarantor Details</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <input placeholder="Guarantor Name" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_name || ''} onChange={e => setFormData({ ...formData, guarantor_name: e.target.value })} />
+                                        <input placeholder="Guarantor CNIC" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_cnic || ''} onChange={e => setFormData({ ...formData, guarantor_cnic: e.target.value })} />
+                                        <input placeholder="Guarantor Phone" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_phone || ''} onChange={e => setFormData({ ...formData, guarantor_phone: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
                         )}
-                        {/* Conditional Fields based on Rental Type */}
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Start Location</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Lahore, Office"
-                                    className="w-full p-2 border rounded-xl bg-slate-50"
-                                    value={formData.pickup_location || ''}
-                                    onChange={e => setFormData({ ...formData, pickup_location: e.target.value })}
-                                />
-                            </div>
 
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Destination</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Multan, Islamabad"
-                                    className="w-full p-2 border rounded-xl bg-slate-50"
-                                    value={formData.destination || ''}
-                                    onChange={e => setFormData({ ...formData, destination: e.target.value })}
-                                />
-                            </div>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <input placeholder="Start Location" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.pickup_location || ''} onChange={e => setFormData({ ...formData, pickup_location: e.target.value })} />
+                            <input placeholder="Destination" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.destination || ''} onChange={e => setFormData({ ...formData, destination: e.target.value })} />
                         </div>
 
                         {/* Odometer Section */}
@@ -519,86 +440,80 @@ const RentalsView: React.FC = () => {
                                         </div>
                                     );
                                 })}
-
-                                {(formData.ride_expenses || []).length > 0 && (
-                                    <div className="flex justify-end px-3 py-1 mt-1">
-                                        <p className="text-xs font-bold text-slate-500">
-                                            Total: <span className="text-slate-800 font-mono text-sm ml-1">
-                                                {formatCurrency((formData.ride_expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0))}
-                                            </span>
-                                        </p>
-                                    </div>
-                                )}
-
-                                {(formData.ride_expenses || []).length === 0 && (
-                                    <p className="text-center py-4 text-xs text-slate-400 italic bg-slate-50/50 rounded-xl border border-dashed">No expenses added yet.</p>
-                                )}
                             </div>
                         </div>
 
-                        {/* Dates */}
                         <div className="grid grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Start Time</label>
-                                <input type="datetime-local" className="w-full p-2 border rounded-xl bg-slate-50"
-                                    value={formData.start_time}
-                                    onChange={e => setFormData({ ...formData, start_time: e.target.value })}
-                                />
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Start Time</label>
+                                <input type="datetime-local" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.start_time} onChange={e => setFormData({ ...formData, start_time: e.target.value })} />
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">End Time</label>
-                                <input type="datetime-local" className="w-full p-2 border rounded-xl bg-slate-50"
-                                    value={formData.end_time}
-                                    onChange={e => setFormData({ ...formData, end_time: e.target.value })}
-                                />
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">End Time</label>
+                                <input type="datetime-local" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.end_time} onChange={e => setFormData({ ...formData, end_time: e.target.value })} />
                             </div>
                         </div>
 
-                        {/* Financials */}
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">
-                                {formData.amount_type === ContractType.PerDay ? 'Rent Rate / Day' : 'Total Rent Amount'}
-                            </label>
+                        <div className="space-y-4">
                             <div className="flex gap-2">
-                                <select
-                                    className="w-1/3 p-2 border rounded-xl bg-slate-50 text-sm font-medium"
-                                    value={formData.amount_type}
-                                    onChange={e => setFormData({ ...formData, amount_type: e.target.value as ContractType })}
-                                >
+                                <select className="w-1/3 p-2 border rounded-xl bg-slate-50" value={formData.amount_type} onChange={e => setFormData({ ...formData, amount_type: e.target.value as ContractType })}>
                                     <option value={ContractType.FixedPrice}>Fixed Price</option>
                                     <option value={ContractType.PerDay}>Per Day</option>
                                 </select>
-                                <input type="number" min="0" className="w-2/3 p-2 border rounded-xl font-mono text-xl" placeholder="0.00"
-                                    value={formData.rent_amount}
-                                    onChange={e => setFormData({ ...formData, rent_amount: Math.max(0, Number(e.target.value)) })}
-                                />
+                                <input type="number" placeholder="Rent Amount" className="w-2/3 p-2 border rounded-xl font-mono text-xl" value={formData.rent_amount} onChange={e => setFormData({ ...formData, rent_amount: Number(e.target.value) })} />
                             </div>
+
+                            {(() => {
+                                const selectedCustomer = customers.find(c => c.id === formData.customer_id);
+                                if (selectedCustomer?.source === CustomerSource.Affiliated) {
+                                    return (
+                                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                            <label className="block text-sm font-bold text-purple-800 mb-1">Commission Amount</label>
+                                            <input type="number" className="w-full p-2 border rounded-xl bg-white font-mono text-purple-700" value={formData.commission_amount || ''} onChange={e => setFormData({ ...formData, commission_amount: Number(e.target.value) })} />
+                                            <p className="text-[10px] text-purple-400 mt-1 font-bold uppercase italic">Affiliate Customer</p>
+                                        </div>
+                                    );
+                                }
+                                if (selectedCustomer?.source === CustomerSource.Reference) {
+                                    return (
+                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                            <label className="block text-sm font-bold text-orange-800 mb-2">Referrer Details</label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="bg-white p-2 rounded-lg border border-orange-200">
+                                                    <p className="text-[10px] text-orange-400 font-bold uppercase">Name</p>
+                                                    <p className="font-medium text-slate-800">{selectedCustomer.reference_name || 'N/A'}</p>
+                                                </div>
+                                                <div className="bg-white p-2 rounded-lg border border-orange-200">
+                                                    <p className="text-[10px] text-orange-400 font-bold uppercase">Phone</p>
+                                                    <p className="font-mono font-medium text-slate-800">{selectedCustomer.reference_phone || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
 
-                        {/* Status (Only for edit) */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Internal Notes / Inspection Remarks</label>
+                            <textarea
+                                className="w-full p-2 border rounded-xl bg-slate-50 text-sm"
+                                rows={3}
+                                placeholder="Any dents, scratches, or special instructions..."
+                                value={formData.inspection_notes || ''}
+                                onChange={e => setFormData({ ...formData, inspection_notes: e.target.value })}
+                            />
+                        </div>
+
                         {selectedRental && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Status</label>
-                                <select
-                                    className="w-full p-2 border rounded-xl bg-slate-50"
-                                    value={formData.status}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}
-                                >
-                                    {Object.values(RentalStatus).map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <select className="w-full p-2 border rounded-xl bg-slate-50" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}>
+                                {Object.values(RentalStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
                         )}
 
-
                         <div className="pt-4 flex gap-4">
-                            {selectedRental && (
-                                <button onClick={() => setViewMode('list')} className="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg font-bold hover:bg-slate-200 cursor-pointer transition">
-                                    Cancel
-                                </button>
-                            )}
-                            <button onClick={handleCreateOrUpdate} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold shadow-xl hover:bg-blue-700 active:scale-95 transition text-lg cursor-pointer">
+                            <button onClick={handleCreateOrUpdate} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition">
                                 {selectedRental ? 'Update Booking' : 'Confirm Booking'}
                             </button>
                         </div>
@@ -606,28 +521,30 @@ const RentalsView: React.FC = () => {
                 </div>
             )}
 
-            {/* Quick Customer Modal */}
             {isQuickCustomerOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsQuickCustomerOpen(false)}>
                     <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold mb-4 text-slate-800">Quick Add Customer</h3>
+                        <h3 className="text-xl font-bold mb-4">Quick Add Customer</h3>
                         <div className="space-y-4">
-                            <input
-                                placeholder="Full Name"
-                                className="w-full p-2.5 border rounded-xl"
-                                value={quickCustomer.name}
-                                onChange={e => setQuickCustomer({ ...quickCustomer, name: e.target.value })}
-                                autoFocus
-                            />
-                            <input
-                                placeholder="Phone Number"
-                                className="w-full p-2.5 border rounded-xl"
-                                value={quickCustomer.phone}
-                                onChange={e => setQuickCustomer({ ...quickCustomer, phone: e.target.value })}
-                            />
-                            <button onClick={handleQuickCustomerSave} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-700 mt-2 cursor-pointer transition">
-                                Save & Select
-                            </button>
+                            <div className="flex gap-2">
+                                {Object.values(CustomerSource).map(s => (
+                                    <label key={s} className="flex-1 text-center p-2 rounded-lg border cursor-pointer text-xs font-bold transition-colors" style={{ backgroundColor: quickCustomer.source === s ? '#EEF2FF' : 'transparent', color: quickCustomer.source === s ? '#4F46E5' : '#64748B', borderColor: quickCustomer.source === s ? '#4F46E5' : '#E2E8F0' }}>
+                                        <input type="radio" className="hidden" name="source" value={s} checked={quickCustomer.source === s} onChange={() => setQuickCustomer({ ...quickCustomer, source: s })} />
+                                        {s}
+                                    </label>
+                                ))}
+                            </div>
+                            <input placeholder="Full Name" className="w-full p-2.5 border rounded-xl" value={quickCustomer.name} onChange={e => setQuickCustomer({ ...quickCustomer, name: e.target.value })} />
+                            <input type="number" placeholder="Phone Number" className="w-full p-2.5 border rounded-xl" value={quickCustomer.phone} onChange={e => setQuickCustomer({ ...quickCustomer, phone: e.target.value })} />
+
+                            {quickCustomer.source === CustomerSource.Reference && (
+                                <div className="space-y-2 p-3 bg-orange-50 rounded-xl border border-orange-100">
+                                    <input placeholder="Referrer Name" className="w-full p-2 border rounded-lg text-sm" value={quickCustomer.reference_name} onChange={e => setQuickCustomer({ ...quickCustomer, reference_name: e.target.value })} />
+                                    <input type="number" placeholder="Referrer Phone" className="w-full p-2 border rounded-lg text-sm" value={quickCustomer.reference_phone} onChange={e => setQuickCustomer({ ...quickCustomer, reference_phone: e.target.value })} />
+                                </div>
+                            )}
+
+                            <button onClick={handleQuickCustomerSave} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold">Save & Select</button>
                         </div>
                     </div>
                 </div>

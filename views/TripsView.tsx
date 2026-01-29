@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getTrips, getVehicles, createTrip, updateTripStatus, generateVoucher } from '../services/api';
-import { Trip, TripStatus, Vehicle, PassengerLog } from '../types';
+import { getTrips, getVehicles, getDrivers, createTrip, updateTripStatus, generateVoucher } from '../services/api';
+import { Trip, TripStatus, Vehicle, Driver, PassengerLog } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -10,6 +10,7 @@ import { STATUS_COLORS, TRIP_TERMINALS, FARE_MATRIX, formatCurrency } from '../c
 const TripsView: React.FC = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
@@ -18,9 +19,10 @@ const TripsView: React.FC = () => {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      const [tripsData, vehiclesData] = await Promise.all([getTrips(), getVehicles()]);
+      const [tripsData, vehiclesData, driversData] = await Promise.all([getTrips(), getVehicles(), getDrivers()]);
       setTrips(tripsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setVehicles(vehiclesData);
+      setDrivers(driversData);
     } catch (error) {
       console.error("Failed to fetch trips:", error);
     } finally {
@@ -172,6 +174,7 @@ const TripsView: React.FC = () => {
         onClose={handleCloseModals}
         onSave={handleSaveTrip}
         vehicles={vehicles}
+        drivers={drivers}
       />
       {selectedTrip && <VoucherFormModal
         isOpen={isVoucherModalOpen}
@@ -189,12 +192,13 @@ interface TripFormModalProps {
   onClose: () => void;
   onSave: (data: Omit<Trip, 'id' | 'tenantId' | 'status'>) => void;
   vehicles: Vehicle[];
+  drivers: Driver[];
 }
 
-const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, vehicles }) => {
+const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, vehicles, drivers }) => {
   const [formData, setFormData] = useState({
     vehicle_id: '',
-    driverId: 'd-temp-01',
+    driverId: '',
     route: [TRIP_TERMINALS[0], TRIP_TERMINALS[1]],
     departureTime: '09:00',
     date: new Date().toISOString().split('T')[0],
@@ -204,7 +208,11 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
     if (vehicles.length > 0 && !formData.vehicle_id) {
       setFormData(prev => ({ ...prev, vehicle_id: vehicles[0].id }));
     }
-  }, [vehicles, isOpen, formData.vehicle_id]);
+    const availableDrivers = drivers.filter(d => d.status === 'Available');
+    if (availableDrivers.length > 0 && !formData.driverId) {
+      setFormData(prev => ({ ...prev, driverId: availableDrivers[0].id }));
+    }
+  }, [vehicles, drivers, isOpen, formData.vehicle_id, formData.driverId]);
 
   const handleRouteChange = (value: string, index: number) => {
     const newRoute = [...formData.route];
@@ -268,7 +276,15 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
         <div>
           <label className="block text-sm font-medium text-slate-700">Vehicle</label>
           <select name="vehicle_id" value={formData.vehicle_id} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
-            {vehicles.filter(v => v.status === 'Active').map(v => <option key={v.id} value={v.id}>{v.licensePlate} ({v.type})</option>)}
+            {vehicles.filter(v => v.status === 'Active').map(v => <option key={v.id} value={v.id}>{v.license_plate} ({v.type})</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Driver</label>
+          <select name="driverId" value={formData.driverId} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
+            {drivers.filter(d => d.status === 'Available' || d.id === formData.driverId).map(d => (
+              <option key={d.id} value={d.id}>{d.name} ({d.status})</option>
+            ))}
           </select>
         </div>
         <div>

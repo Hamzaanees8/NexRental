@@ -1,4 +1,9 @@
 
+export enum CustomerSource {
+  Direct = 'Direct',
+  Reference = 'Reference',
+  Affiliated = 'Affiliated',
+}
 
 export enum VehicleStatus {
   Active = 'Active',
@@ -34,6 +39,9 @@ export interface Customer {
   license_number?: string;
   address?: string;
   internal_remarks?: string;
+  source?: CustomerSource;
+  reference_name?: string;
+  reference_phone?: string;
 }
 
 export interface Driver {
@@ -125,6 +133,8 @@ export interface Rental {
   self_drive_phone?: string;
   guarantor_name?: string;
   guarantor_info?: string;
+  guarantor_cnic?: string;
+  guarantor_phone?: string;
   amount_type?: ContractType;
 
   // Expenses incurred during this specific rental
@@ -136,6 +146,7 @@ export interface Rental {
 
   total_cost?: number; // Sum of expenses
   net_profit?: number; // rent_amount - total_cost
+  commission_amount?: number;
 }
 
 export enum TransactionType {

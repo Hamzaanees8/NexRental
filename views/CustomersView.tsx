@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../services/api';
-import { Customer } from '../types';
+import { Customer, CustomerSource } from '../types';
 import { PlusIcon } from '../components/icons';
 
 const CustomersView: React.FC = () => {
@@ -116,7 +116,20 @@ const CustomersView: React.FC = () => {
                         <div className="flex flex-wrap gap-2 text-slate-500 text-sm font-mono mb-2">
                             <span>{customer.phone}</span>
                             {customer.whatsapp && <span className="text-green-600">| WA: {customer.whatsapp}</span>}
+                            {customer.source && (
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${customer.source === CustomerSource.Affiliated ? 'bg-purple-100 text-purple-700' :
+                                        customer.source === CustomerSource.Reference ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                    {customer.source}
+                                </span>
+                            )}
                         </div>
+                        {customer.source === CustomerSource.Reference && (
+                            <div className="mb-2 p-2 bg-orange-50 rounded-lg text-xs border border-orange-100">
+                                <p className="font-bold text-orange-800">Ref: {customer.reference_name}</p>
+                                <p className="text-orange-600 font-mono">{customer.reference_phone}</p>
+                            </div>
+                        )}
 
                         {(customer.address || customer.cnic || customer.license_number || customer.internal_remarks) && (
                             <div className="pt-2 border-t border-slate-50 text-xs text-slate-400 space-y-1">
@@ -162,6 +175,9 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
         address: '',
         license_number: '',
         internal_remarks: '',
+        source: CustomerSource.Direct,
+        reference_name: '',
+        reference_phone: '',
         ...initialData
     });
 
@@ -176,7 +192,26 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
     };
 
     return (
-        <div className="space-y-4 overflow-y-auto max-h-[400px]">
+        <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Customer Source</label>
+                <div className="flex flex-wrap gap-4">
+                    {Object.values(CustomerSource).map(source => (
+                        <label key={source} className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                type="radio"
+                                name="source"
+                                value={source}
+                                checked={formData.source === source}
+                                onChange={() => setFormData({ ...formData, source })}
+                                className="w-4 h-4 text-blue-600"
+                            />
+                            <span className={`text-sm ${formData.source === source ? 'font-bold text-blue-700' : 'text-slate-600'}`}>{source}</span>
+                        </label>
+                    ))}
+                </div>
+            </div>
+
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
                 <input name="name" value={formData.name} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
@@ -191,20 +226,38 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
                     <input name="whatsapp" value={formData.whatsapp} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Driving License (Optional)</label>
-                    <input name="license_number" value={formData.license_number} onChange={handleChange} className="w-full p-2.5 border rounded-xl" placeholder="Provincial/Federal ID" />
+
+            {formData.source === CustomerSource.Reference && (
+                <div className="grid grid-cols-2 gap-4 p-4 bg-orange-50 rounded-xl border border-orange-100">
+                    <div>
+                        <label className="block text-sm font-bold text-orange-800 mb-1">Reference Name</label>
+                        <input name="reference_name" value={formData.reference_name} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white shadow-sm" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-orange-800 mb-1">Reference Phone</label>
+                        <input name="reference_phone" value={formData.reference_phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white shadow-sm" required />
+                    </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">CNIC (Optional)</label>
-                    <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
-                </div>
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Address (Optional)</label>
-                <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
-            </div>
+            )}
+
+            {formData.source !== CustomerSource.Affiliated && (
+                <>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Driving License (Optional)</label>
+                            <input name="license_number" value={formData.license_number} onChange={handleChange} className="w-full p-2.5 border rounded-xl" placeholder="Provincial/Federal ID" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">CNIC (Optional)</label>
+                            <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Address (Optional)</label>
+                        <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
+                    </div>
+                </>
+            )}
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Internal Remarks</label>
                 <textarea
