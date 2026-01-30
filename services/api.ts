@@ -157,11 +157,16 @@ export const generateVoucher = async (
 
 // Financials
 export const getFinanceSummary = async (): Promise<FinancialSummary> => {
-  const { data: transactions, error } = await supabase
-    .from("financial_transactions")
-    .select("*")
-    .eq("tenant_id", TENANT_ID);
-  if (error) throw new Error(error.message);
+  const [
+    { data: transactions, error: txError },
+    { data: settledRentals, error: rentalError }
+  ] = await Promise.all([
+    supabase.from("financial_transactions").select("*").eq("tenant_id", TENANT_ID),
+    supabase.from("rentals").select("*").eq("tenant_id", TENANT_ID).eq("status", "Settled")
+  ]);
+
+  if (txError) throw new Error(txError.message);
+  if (rentalError) throw new Error(rentalError.message);
 
   const summary: FinancialSummary = {
     totalRevenue: 0,
@@ -171,7 +176,10 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
   };
   const dailyMap: { [key: string]: { revenue: number; costs: number } } = {};
 
-  transactions.forEach((t) => {
+  // Track which rentals already have an income transaction
+  const txRentalIds = new Set(transactions?.filter(t => t.type === TransactionType.RentalIncome).map(t => t.rental_id));
+
+  transactions?.forEach((t) => {
     const dateStr = new Date(t.date).toISOString().split("T")[0];
     if (!dailyMap[dateStr]) {
       dailyMap[dateStr] = { revenue: 0, costs: 0 };
@@ -187,6 +195,30 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
     } else {
       summary.totalRevenue += t.amount;
       dailyMap[dateStr].revenue += t.amount;
+    }
+  });
+
+  // Add revenue and expenses from Settled rentals that don't have a transaction yet
+  settledRentals?.forEach((r) => {
+    if (!txRentalIds.has(r.id)) {
+      const dateStr = new Date(r.start_time).toISOString().split("T")[0];
+      if (!dailyMap[dateStr]) {
+        dailyMap[dateStr] = { revenue: 0, costs: 0 };
+      }
+      
+      // Virtual Revenue
+      summary.totalRevenue += r.rent_amount;
+      dailyMap[dateStr].revenue += r.rent_amount;
+
+      // Virtual Expenses
+      const totalExpenses = (r.fuel_cost || 0) + 
+                          (r.toll_cost || 0) + 
+                          (r.driver_allowance || 0) + 
+                          (r.other_expenses || 0) +
+                          (r.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
+      
+      summary.totalCosts += totalExpenses;
+      dailyMap[dateStr].costs += totalExpenses;
     }
   });
 
@@ -441,15 +473,72 @@ export const createRental = async (
 
 export const updateRental = async (
   id: string,
-  rental: Partial<Rental>
+  updates: Partial<Rental>
 ): Promise<Rental> => {
+  // 1. Fetch current version to see if status is CHANGING to Settled
+  const { data: current, error: fetchError } = await supabase
+    .from("rentals")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (fetchError) throw new Error(fetchError.message);
+
+  // 2. Perform the update
   const { data, error } = await supabase
     .from("rentals")
-    .update(rental)
+    .update(updates)
     .eq("id", id)
     .select();
+  
   if (error) throw new Error(error.message);
-  return data[0] as Rental;
+  const updated = data[0] as Rental;
+
+  // 3. If turning Settled, create financial transactions
+  if (updates.status === RentalStatus.Settled && current.status !== RentalStatus.Settled) {
+    // Check if transactions already exist for this rental to avoid duplicates
+    const { data: existingTx } = await supabase
+      .from("financial_transactions")
+      .select("id")
+      .eq("rental_id", id);
+    
+    if (!existingTx || existingTx.length === 0) {
+      // Create Income Transaction
+      const incomeTx = {
+        tenant_id: TENANT_ID,
+        rental_id: id,
+        type: TransactionType.RentalIncome,
+        amount: updated.rent_amount,
+        description: `Rental Income: Booking #${id.slice(0, 8)}`,
+        date: new Date().toISOString(),
+        vehicle_id: updated.vehicle_id
+      };
+      
+      await supabase.from("financial_transactions").insert([incomeTx]);
+
+      // Create Expense Transaction (if exists)
+      const totalExpenses = (updated.fuel_cost || 0) + 
+                          (updated.toll_cost || 0) + 
+                          (updated.driver_allowance || 0) + 
+                          (updated.other_expenses || 0) +
+                          (updated.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
+      
+      if (totalExpenses > 0) {
+        const expenseTx = {
+          tenant_id: TENANT_ID,
+          rental_id: id,
+          type: TransactionType.TripExpense,
+          amount: totalExpenses,
+          description: `Total Expenses for Booking #${id.slice(0, 8)}`,
+          date: new Date().toISOString(),
+          vehicle_id: updated.vehicle_id
+        };
+        await supabase.from("financial_transactions").insert([expenseTx]);
+      }
+    }
+  }
+
+  return updated;
 };
 
 export const deleteRental = async (id: string): Promise<void> => {

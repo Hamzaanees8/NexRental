@@ -123,13 +123,13 @@ const MaintenanceView: React.FC = () => {
                 >
                   ✎
                 </button>
-                <button
+                {/* <button
                   onClick={() => handleDeleteRecord(r.id)}
                   className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                   title="Delete"
                 >
                   🗑
-                </button>
+                </button> */}
               </div>
               <div>
                 <div className="flex justify-between items-start mb-2">

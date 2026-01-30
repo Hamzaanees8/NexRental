@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fleet Ops Management</title>
+    <script>
+      (function() {
+        const script = document.createElement('script');
+        // This will be replaced by Vite during build/dev
+        const apiKey = "%VITE_GOOGLE_MAPS_API_KEY%";
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        document.head.appendChild(script);
+      })();
+    </script>
 </head>
   <body class="bg-slate-50">
     <div id="root"></div>

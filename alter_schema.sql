@@ -62,6 +62,8 @@ CREATE TABLE rentals (
     self_drive_phone TEXT,
     guarantor_name TEXT,
     guarantor_info TEXT,
+    guarantor_cnic TEXT,
+    guarantor_phone TEXT,
     amount_type TEXT DEFAULT 'Fixed Price',
     ride_expenses JSONB DEFAULT '[]',
     
@@ -73,6 +75,8 @@ CREATE TABLE rentals (
     
     total_cost DECIMAL DEFAULT 0,
     net_profit DECIMAL DEFAULT 0,
+    commission_amount DECIMAL DEFAULT 0,
+    allowed_cities JSONB DEFAULT '[]',
     
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

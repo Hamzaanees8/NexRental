@@ -104,13 +104,13 @@ const CustomersView: React.FC = () => {
                             >
                                 ✎
                             </button>
-                            <button
+                            {/* <button
                                 onClick={() => handleDelete(customer.id)}
                                 className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                 title="Delete"
                             >
                                 🗑
-                            </button>
+                            </button> */}
                         </div>
                         <h3 className="font-bold text-lg text-slate-800">{customer.name}</h3>
                         <div className="flex flex-wrap gap-2 text-slate-500 text-sm font-mono mb-2">
@@ -118,7 +118,7 @@ const CustomersView: React.FC = () => {
                             {customer.whatsapp && <span className="text-green-600">| WA: {customer.whatsapp}</span>}
                             {customer.source && (
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${customer.source === CustomerSource.Affiliated ? 'bg-purple-100 text-purple-700' :
-                                        customer.source === CustomerSource.Reference ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                                    customer.source === CustomerSource.Reference ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                                     }`}>
                                     {customer.source}
                                 </span>
@@ -219,11 +219,11 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Phone</label>
-                    <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
+                    <input type="number" name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp (Optional)</label>
-                    <input name="whatsapp" value={formData.whatsapp} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
+                    <input type="number" name="whatsapp" value={formData.whatsapp} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
                 </div>
             </div>
 
@@ -235,7 +235,7 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-orange-800 mb-1">Reference Phone</label>
-                        <input name="reference_phone" value={formData.reference_phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white shadow-sm" required />
+                        <input type="number" name="reference_phone" value={formData.reference_phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white shadow-sm" required />
                     </div>
                 </div>
             )}

@@ -147,6 +147,7 @@ export interface Rental {
   total_cost?: number; // Sum of expenses
   net_profit?: number; // rent_amount - total_cost
   commission_amount?: number;
+  allowed_cities?: string[];
 }
 
 export enum TransactionType {

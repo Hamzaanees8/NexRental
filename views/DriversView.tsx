@@ -196,7 +196,7 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Phone</label>
-                    <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
+                    <input type="number" name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2.5 border rounded-xl" required />
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Base Salary</label>

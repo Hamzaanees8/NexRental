@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType, CustomerSource } from '../types';
-import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental } from '../services/api';
+import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental, getSettings, updateSettings } from '../services/api';
 import { formatCurrency, RIDE_EXPENSE_TYPES } from '../constants';
 import { PlusIcon } from '../components/icons';
 import SearchableSelect from '../components/SearchableSelect';
+import MultiSearchableSelect from '../components/MultiSearchableSelect';
+import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
 
 const RentalsView: React.FC = () => {
     const [viewMode, setViewMode] = useState<'list' | 'create' | 'details'>('list');
@@ -11,6 +13,7 @@ const RentalsView: React.FC = () => {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [drivers, setDrivers] = useState<Driver[]>([]);
+    const [locations, setLocations] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
@@ -41,7 +44,8 @@ const RentalsView: React.FC = () => {
         amount_type: ContractType.FixedPrice,
         ride_expenses: [],
         inspection_notes: '',
-        commission_amount: 0
+        commission_amount: 0,
+        allowed_cities: []
     });
 
     // Quick Customer Modal
@@ -61,11 +65,12 @@ const RentalsView: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [r, v, c, d] = await Promise.all([getRentals(), getVehicles(), getCustomers(), getDrivers()]);
+            const [r, v, c, d, s] = await Promise.all([getRentals(), getVehicles(), getCustomers(), getDrivers(), getSettings()]);
             setRentals(r);
             setVehicles(v);
             setCustomers(c);
             setDrivers(d);
+            setLocations(s?.locations || []);
         } catch (e) {
             console.error(e);
         } finally {
@@ -133,7 +138,8 @@ const RentalsView: React.FC = () => {
             ...rental,
             start_time: new Date(rental.start_time).toISOString().slice(0, 16),
             end_time: new Date(rental.end_time).toISOString().slice(0, 16),
-            ride_expenses: rental.ride_expenses || []
+            ride_expenses: rental.ride_expenses || [],
+            allowed_cities: rental.allowed_cities || []
         });
         setViewMode('create');
     }
@@ -165,7 +171,8 @@ const RentalsView: React.FC = () => {
             amount_type: ContractType.FixedPrice,
             ride_expenses: [],
             inspection_notes: '',
-            commission_amount: 0
+            commission_amount: 0,
+            allowed_cities: []
         });
         setViewMode('create');
     }
@@ -192,13 +199,25 @@ const RentalsView: React.FC = () => {
         });
     };
 
+    const handleAddNewLocation = async (newLoc: string) => {
+        if (!newLoc) return;
+        try {
+            const currentSettings = await getSettings();
+            const updatedLocations = [...(currentSettings?.locations || []), newLoc];
+            await updateSettings({ locations: updatedLocations });
+            setLocations(updatedLocations);
+        } catch (error) {
+            console.error("Failed to add new location:", error);
+        }
+    };
+
     if (loading) return <div className="p-4 text-center">Loading Rentals...</div>;
 
     const availableDrivers = drivers.filter(d => d.status === 'Available' || d.id === formData.driver_id);
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto pb-20 px-4">
-            <header className="flex justify-between items-center sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
+            <header className="flex justify-between items-center sticky top-0 bg-slate-50 z-10 py-4 shadow-sm px-4 rounded-xl">
                 <h1 className="text-2xl font-bold">Car Rentals</h1>
                 {viewMode === 'list' && (
                     <button
@@ -333,7 +352,7 @@ const RentalsView: React.FC = () => {
                             <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <input placeholder="Driver Name" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_name || ''} onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })} />
-                                    <input placeholder="Driver Phone" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_phone || ''} onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })} />
+                                    <input type="number" placeholder="Driver Phone" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_phone || ''} onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input placeholder="License No" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_license || ''} onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })} />
@@ -344,14 +363,18 @@ const RentalsView: React.FC = () => {
                                     <div className="grid grid-cols-3 gap-2">
                                         <input placeholder="Guarantor Name" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_name || ''} onChange={e => setFormData({ ...formData, guarantor_name: e.target.value })} />
                                         <input placeholder="Guarantor CNIC" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_cnic || ''} onChange={e => setFormData({ ...formData, guarantor_cnic: e.target.value })} />
-                                        <input placeholder="Guarantor Phone" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_phone || ''} onChange={e => setFormData({ ...formData, guarantor_phone: e.target.value })} />
+                                        <input type="number" placeholder="Guarantor Phone" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_phone || ''} onChange={e => setFormData({ ...formData, guarantor_phone: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         <div className="grid md:grid-cols-2 gap-6">
-                            <input placeholder="Start Location" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.pickup_location || ''} onChange={e => setFormData({ ...formData, pickup_location: e.target.value })} />
+                            <GoogleAutocompleteInput
+                                placeholder="Start Location"
+                                value={formData.pickup_location || ''}
+                                onChange={(val) => setFormData({ ...formData, pickup_location: val })}
+                            />
                             <input placeholder="Destination" className="w-full p-2 border rounded-xl bg-slate-50" value={formData.destination || ''} onChange={e => setFormData({ ...formData, destination: e.target.value })} />
                         </div>
 
@@ -493,6 +516,17 @@ const RentalsView: React.FC = () => {
                                 }
                                 return null;
                             })()}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100">
+                            <MultiSearchableSelect
+                                options={locations}
+                                selected={formData.allowed_cities || []}
+                                onChange={(selected) => setFormData({ ...formData, allowed_cities: selected })}
+                                onAddNew={handleAddNewLocation}
+                                label="Allowed Cities"
+                                placeholder="Select cities..."
+                            />
                         </div>
 
                         <div>

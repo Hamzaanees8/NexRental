@@ -15,6 +15,10 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Date Range Filtering
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
   useEffect(() => {
     const fetchData = async () => {
       console.log("fetchData called");
@@ -45,23 +49,35 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
     fetchData();
   }, []);
 
-  const activeRentals = rentals.filter(r => r.status === RentalStatus.Active).length;
-  const reservedRentals = rentals.filter(r => r.status === RentalStatus.Reserved).length;
+  // Filtered Data
+  const filteredDailyData = summary?.dailyData.filter(d => d.date >= startDate && d.date <= endDate) || [];
+  const filteredRentals = rentals.filter(r => {
+    const rDate = r.start_time.split('T')[0];
+    return rDate >= startDate && rDate <= endDate;
+  });
+  const filteredTrips = trips.filter(t => t.date >= startDate && t.date <= endDate);
+  const filteredMaintenance = maintenanceRecords.filter(m => m.date >= startDate && m.date <= endDate);
+
+  const totalRevenueInRange = filteredDailyData.reduce((sum, d) => sum + d.revenue, 0);
+  const totalProfitInRange = filteredDailyData.reduce((sum, d) => sum + d.profit, 0);
+
+  const activeRentals = filteredRentals.filter(r => r.status === RentalStatus.Active).length;
+  const reservedRentals = filteredRentals.filter(r => r.status === RentalStatus.Reserved).length;
 
   const summaryChartData = [
     ...Object.values(TripStatus).map(status => ({
       name: `Trip: ${status}`,
-      value: trips.filter(trip => trip.status === status).length,
+      value: filteredTrips.filter(trip => trip.status === status).length,
       colorName: status
     })),
     ...Object.values(RentalStatus).map(status => ({
       name: `Rental: ${status}`,
-      value: rentals.filter(rental => rental.status === status).length,
+      value: filteredRentals.filter(rental => rental.status === status).length,
       colorName: status
     }))
   ].filter(item => item.value > 0);
 
-  const expenseData = maintenanceRecords.reduce((acc, record) => {
+  const expenseData = filteredMaintenance.reduce((acc, record) => {
     acc[record.type] = (acc[record.type] || 0) + record.cost;
     return acc;
   }, {} as Record<string, number>);
@@ -84,37 +100,67 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-        <button
-          onClick={() => setCurrentView('rentals')}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-blue-700 active:scale-95 transition font-bold cursor-pointer"
-        >
-          + New Booking
-        </button>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
+          <p className="text-slate-500 text-sm mt-1">Overview of your fleet operations</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl">
+            <span className="text-xs font-bold text-slate-400 uppercase">From</span>
+            <input
+              type="date"
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl">
+            <span className="text-xs font-bold text-slate-400 uppercase">To</span>
+            <input
+              type="date"
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={() => setCurrentView('rentals')}
+            className="bg-indigo-600 text-white px-5 py-2 rounded-xl shadow-md hover:bg-indigo-700 active:scale-95 transition font-bold text-sm cursor-pointer ml-2"
+          >
+            + New Booking
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card>
-          <h4 className="text-sm font-medium text-slate-500">Total Revenue (Today)</h4>
-          <p className="text-3xl font-bold text-green-600">{formatCurrency(summary?.dailyData.slice(-1)[0]?.revenue || 0)}</p>
+          <h4 className="text-sm font-medium text-slate-500">Revenue in Range</h4>
+          <p className="text-3xl font-bold text-green-600">{formatCurrency(totalRevenueInRange)}</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Total Sales</p>
         </Card>
         <Card>
-          <h4 className="text-sm font-medium text-slate-500">Net Profit (Today)</h4>
-          <p className="text-3xl font-bold text-indigo-600">{formatCurrency(summary?.dailyData.slice(-1)[0]?.profit || 0)}</p>
+          <h4 className="text-sm font-medium text-slate-500">Net Profit in Range</h4>
+          <p className="text-3xl font-bold text-indigo-600">{formatCurrency(totalProfitInRange)}</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">After Expenses</p>
         </Card>
         <Card>
-          <h4 className="text-sm font-medium text-slate-500">Active Rentals</h4>
-          <p className="text-3xl font-bold text-blue-600">{activeRentals}</p>
+          <h4 className="text-sm font-medium text-slate-500">Bookings in Range</h4>
+          <p className="text-3xl font-bold text-blue-600">{filteredRentals.length}</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">{activeRentals} Active Currently</p>
         </Card>
         <Card>
-          <h4 className="text-sm font-medium text-slate-500">Reserved (Pending)</h4>
-          <p className="text-3xl font-bold text-orange-500">{reservedRentals}</p>
+          <h4 className="text-sm font-medium text-slate-500">Avg. Revenue / Day</h4>
+          <p className="text-3xl font-bold text-orange-500">
+            {formatCurrency(filteredDailyData.length ? totalRevenueInRange / filteredDailyData.length : 0)}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Based on selected range</p>
         </Card>
       </div>
 
-      <Card title="Financial Overview (Last 7 Days)" className="mb-6">
+      <Card title={`Financial Trend (${startDate} to ${endDate})`} className="mb-6">
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={summary?.dailyData.slice(-7)}>
+          <BarChart data={filteredDailyData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" tickFormatter={(dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
             <YAxis tickFormatter={(val) => `PKR ${val / 1000}k`} />
@@ -199,11 +245,11 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
 
         <Card title="Recent Trips">
           <div className="space-y-4">
-            {trips.slice(0, 5).map(trip => (
-              <div key={trip.id} className="flex items-center justify-between">
+            {filteredTrips.slice(0, 5).map(trip => (
+              <div key={trip.id} className="flex items-center justify-between border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                 <div>
-                  <p className="font-semibold">{trip.route.join(' to ')}</p>
-                  <p className="text-sm text-slate-500">Veh: {vehicles.find(v => v.id === trip.vehicle_id)?.license_plate || 'N/A'} | {trip.departureTime}</p>
+                  <p className="font-semibold text-sm">{trip.route.join(' → ')}</p>
+                  <p className="text-[11px] text-slate-500">{new Date(trip.date).toLocaleDateString()} | {trip.departureTime}</p>
                 </div>
                 <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[trip.status]}`}>
                   {trip.status}
