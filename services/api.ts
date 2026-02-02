@@ -683,6 +683,60 @@ export const updateRental = async (
       .delete()
       .eq("rental_id", id);
   }
+  // 5. If getting update while ALREADY Settled, update transactions
+  else if (current.status === RentalStatus.Settled && (!updates.status || updates.status === RentalStatus.Settled)) {
+    // Update Income Transaction
+    if (updates.rent_amount !== undefined) {
+      await supabase
+        .from("financial_transactions")
+        .update({ amount: updates.rent_amount })
+        .eq("rental_id", id)
+        .eq("type", TransactionType.RentalIncome);
+    }
+
+    // Update Expense Transaction
+    const totalExpenses = (updated.fuel_cost || 0) + 
+                        (updated.toll_cost || 0) + 
+                        (updated.driver_allowance || 0) + 
+                        (updated.other_expenses || 0) +
+                        (updated.commission_amount || 0) +
+                        (updated.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
+    
+    // Find existing expense tx
+    const { data: existingExpenseTx } = await supabase
+      .from("financial_transactions")
+      .select("id")
+      .eq("rental_id", id)
+      .eq("type", TransactionType.TripExpense);
+
+    if (existingExpenseTx && existingExpenseTx.length > 0) {
+      if (totalExpenses > 0) {
+        // Update existing
+        await supabase
+          .from("financial_transactions")
+          .update({ amount: totalExpenses })
+          .eq("id", existingExpenseTx[0].id);
+      } else {
+        // Remove if expenses are now 0
+        await supabase
+          .from("financial_transactions")
+          .delete()
+          .eq("id", existingExpenseTx[0].id);
+      }
+    } else if (totalExpenses > 0) {
+      // Create new if didn't exist but now expenses > 0
+      const expenseTx = {
+        tenant_id: TENANT_ID,
+        rental_id: id,
+        type: TransactionType.TripExpense,
+        amount: totalExpenses,
+        description: `Total Expenses for Booking #${id.slice(0, 8)}`,
+        date: new Date().toISOString(),
+        vehicle_id: updated.vehicle_id
+      };
+      await supabase.from("financial_transactions").insert([expenseTx]);
+    }
+  }
 
   return updated;
 };
