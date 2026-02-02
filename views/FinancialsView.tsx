@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getTransactions, createExpense, getVehicles, createPrivateHire, updateTransaction } from '../services/api';
+import { getTransactions, createExpense, getVehicles, createPrivateHire, updateTransaction, deleteTransaction } from '../services/api';
 import { Transaction, TransactionType, Vehicle, ContractType } from '../types';
 import { TRANSACTION_TYPE_COLORS, EXPENSE_TYPES, formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
@@ -101,6 +101,17 @@ const FinancialsView: React.FC = () => {
     }
   }
 
+  const handleDelete = async (t: Transaction) => {
+    if (!window.confirm(`Are you sure you want to delete this transaction: ${t.description}?`)) return;
+    try {
+      await deleteTransaction(t.id);
+      toast.success("Transaction deleted");
+      fetchFinancialData();
+    } catch (error) {
+      toast.error("Failed to delete transaction");
+    }
+  };
+
   const filteredTransactions = transactions.filter(t => {
     const v = vehicles.find(veh => veh.id === t.vehicle_id);
     const search = searchTerm.toLowerCase();
@@ -195,9 +206,9 @@ const FinancialsView: React.FC = () => {
           const isExpense = isExpenseType(t.type);
           const vehicle = vehicles.find(v => v.id === t.vehicle_id);
           return (
-            <div key={t.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-50 flex justify-between items-center group relative cursor-pointer hover:bg-slate-50 transition" onClick={() => openEditModal(t)}>
+            <div key={t.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-50 flex justify-between items-center group relative hover:bg-slate-50 transition">
 
-              <div className="flex items-start gap-2.5">
+              <div className="flex items-start gap-2.5 flex-1 cursor-pointer" onClick={() => openEditModal(t)}>
                 <div className={`p-2 rounded-lg ${isExpense ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                   {isExpense ? '↓' : '↑'}
                 </div>
@@ -217,7 +228,25 @@ const FinancialsView: React.FC = () => {
                 <div className={`font-mono font-bold ${isExpense ? 'text-slate-900' : 'text-green-600'}`}>
                   {isExpense ? '-' : '+'}{formatCurrency(t.amount)}
                 </div>
-                <span className="text-slate-300 group-hover:text-blue-500 text-xs hidden sm:block">Edit</span>
+                {/* <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditModal(t);
+                  }}
+                  className="text-slate-300 group-hover:text-blue-500 text-xs hidden sm:block cursor-pointer hover:underline"
+                >
+                  Edit
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(t);
+                  }}
+                  className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition cursor-pointer"
+                  title="Delete"
+                >
+                  🗑️
+                </button> */}
               </div>
             </div>
           )

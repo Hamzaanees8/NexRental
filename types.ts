@@ -53,6 +53,7 @@ export interface Driver {
   phone: string;
   license_no: string;
   cnic?: string;
+  cnic_expiry?: string;
   license_expiry?: string; // ISO date string
   status: 'Available' | 'On Trip' | 'Inactive';
   base_salary?: number;
@@ -180,6 +181,7 @@ export interface Transaction {
   trip_id?: string;
   vehicle_id?: string;
   rental_id?: string;
+  maintenance_id?: string;
 
   // Private Hire specific fields
   contract_type?: ContractType; 
@@ -190,7 +192,7 @@ export enum MaintenanceType {
   TireChange = 'Tire Change',
   EngineRepair = 'Engine Repair',
   Fuel = 'Fuel',
-  Toll = 'Toll',
+  // Toll = 'Toll',
   Other = 'Other'
 }
 

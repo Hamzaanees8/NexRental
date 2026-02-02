@@ -180,6 +180,11 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
   const txRentalIds = new Set(transactions?.filter(t => t.type === TransactionType.RentalIncome).map(t => t.rental_id));
 
   transactions?.forEach((t) => {
+    // Skip M-Tag transactions - they're internal transfers, not revenue or expenses
+    if (t.type === TransactionType.MTagTopUp || t.type === TransactionType.MTagUsage) {
+      return;
+    }
+
     const dateStr = new Date(t.date).toISOString().split("T")[0];
     if (!dailyMap[dateStr]) {
       dailyMap[dateStr] = { revenue: 0, costs: 0 };
@@ -219,6 +224,7 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
                           (r.toll_cost || 0) + 
                           (r.driver_allowance || 0) + 
                           (r.other_expenses || 0) +
+                          (r.commission_amount || 0) +
                           (r.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
       
       summary.totalCosts += totalExpenses;
@@ -252,13 +258,70 @@ export const updateTransaction = async (
   id: string,
   transaction: Partial<Transaction>
 ): Promise<Transaction> => {
+  // 1. Get the current transaction to check for maintenance link
+  const { data: current, error: fetchError } = await supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (fetchError) throw new Error(fetchError.message);
+
+  // 2. Update the transaction
   const { data, error } = await supabase
     .from("financial_transactions")
     .update(transaction)
     .eq("id", id)
     .select();
   if (error) throw new Error(error.message);
-  return data[0] as Transaction;
+
+  const updated = data[0] as Transaction;
+
+  // 3. If this transaction is linked to a maintenance record, update it too
+  if (current.maintenance_id && (transaction.amount !== undefined || transaction.date !== undefined)) {
+    const maintenanceUpdates: any = {};
+    if (transaction.amount !== undefined) {
+      maintenanceUpdates.cost = transaction.amount;
+    }
+    if (transaction.date !== undefined) {
+      maintenanceUpdates.date = transaction.date;
+    }
+    
+    if (Object.keys(maintenanceUpdates).length > 0) {
+      await supabase
+        .from("maintenance_records")
+        .update(maintenanceUpdates)
+        .eq("id", current.maintenance_id);
+    }
+  }
+
+  return updated;
+};
+
+export const deleteTransaction = async (id: string): Promise<void> => {
+  // 1. Get the transaction to check for maintenance link
+  const { data: transaction, error: fetchError } = await supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (fetchError) throw new Error(fetchError.message);
+
+  // 2. If linked to a maintenance record, delete it too
+  if (transaction.maintenance_id) {
+    await supabase
+      .from("maintenance_records")
+      .delete()
+      .eq("id", transaction.maintenance_id);
+  }
+
+  // 3. Delete the transaction
+  const { error } = await supabase
+    .from("financial_transactions")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 };
 
 export const createExpense = async (
@@ -307,6 +370,16 @@ export const updateMaintenanceRecord = async (
   id: string,
   updates: Partial<MaintenanceRecord>
 ): Promise<MaintenanceRecord> => {
+  // 1. Get the current record
+  const { data: current, error: fetchError } = await supabase
+    .from("maintenance_records")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (fetchError) throw new Error(fetchError.message);
+
+  // 2. Update the maintenance record
   const { data, error } = await supabase
     .from("maintenance_records")
     .update(updates)
@@ -314,17 +387,56 @@ export const updateMaintenanceRecord = async (
     .select();
   if (error) throw new Error(error.message);
 
-  // // If odometer was updated, sync it to the vehicle
-  // if (updates.odometer && data[0]?.vehicle_id) {
-  //   await updateVehicle(data[0].vehicle_id, {
-  //     current_odometer: updates.odometer,
-  //   });
-  // }
+  const updated = data[0] as MaintenanceRecord;
 
-  return data[0] as MaintenanceRecord;
+  // 3. Find and update the associated financial transaction
+  // We look for an Expense transaction with matching vehicle_id and close date/amount
+  const { data: existingTx } = await supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("type", TransactionType.Expense)
+    .eq("vehicle_id", current.vehicle_id)
+    .eq("date", current.date)
+    .eq("amount", current.cost);
+
+  if (existingTx && existingTx.length > 0) {
+    // Update the transaction with new values
+    const vehicle = await getVehicle(updated.vehicle_id);
+    await supabase
+      .from("financial_transactions")
+      .update({
+        amount: updates.cost !== undefined ? updates.cost : current.cost,
+        date: updates.date !== undefined ? updates.date : current.date,
+        description: `${updates.type || current.type} for ${vehicle?.license_plate || updated.vehicle_id}`,
+        vehicle_id: updated.vehicle_id
+      })
+      .eq("id", existingTx[0].id);
+  }
+
+  return updated;
 };
 
 export const deleteMaintenanceRecord = async (id: string): Promise<void> => {
+  // 1. Get the maintenance record before deleting
+  const { data: record, error: fetchError } = await supabase
+    .from("maintenance_records")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (fetchError) throw new Error(fetchError.message);
+
+  // 2. Find and delete the associated financial transaction
+  // Look for an Expense transaction with matching vehicle_id, date, and amount
+  await supabase
+    .from("financial_transactions")
+    .delete()
+    .eq("type", TransactionType.Expense)
+    .eq("vehicle_id", record.vehicle_id)
+    .eq("date", record.date)
+    .eq("amount", record.cost);
+
+  // 3. Delete the maintenance record
   const { error } = await supabase
     .from("maintenance_records")
     .delete()
@@ -347,6 +459,7 @@ export const createMaintenanceRecord = async (
 
   // Create corresponding expense transaction
   const vehicle = await getVehicle(newRecord.vehicle_id);
+  const createdRecord = data[0] as MaintenanceRecord;
   const newTransaction = {
     tenant_id: TENANT_ID,
     type: TransactionType.Expense,
@@ -356,6 +469,7 @@ export const createMaintenanceRecord = async (
     }`,
     date: newRecord.date,
     vehicle_id: newRecord.vehicle_id,
+    maintenance_id: createdRecord.id, // Link to maintenance record
   };
   await createExpense(newTransaction);
 
@@ -540,6 +654,7 @@ export const updateRental = async (
                           (updated.toll_cost || 0) + 
                           (updated.driver_allowance || 0) + 
                           (updated.other_expenses || 0) +
+                          (updated.commission_amount || 0) +
                           (updated.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
       
       if (totalExpenses > 0) {
@@ -555,12 +670,31 @@ export const updateRental = async (
         await supabase.from("financial_transactions").insert([expenseTx]);
       }
     }
+  } 
+  // 4. If changing status FROM a finalized state (Settled/Completed) to something else, remove transactions
+  else if (
+    (current.status === RentalStatus.Settled || current.status === RentalStatus.Completed) && 
+    updates.status && 
+    updates.status !== RentalStatus.Settled && 
+    updates.status !== RentalStatus.Completed
+  ) {
+    await supabase
+      .from("financial_transactions")
+      .delete()
+      .eq("rental_id", id);
   }
 
   return updated;
 };
 
 export const deleteRental = async (id: string): Promise<void> => {
+  // 1. Delete linked transactions first
+  await supabase
+    .from("financial_transactions")
+    .delete()
+    .eq("rental_id", id);
+
+  // 2. Delete the rental
   const { error } = await supabase
     .from("rentals")
     .delete()

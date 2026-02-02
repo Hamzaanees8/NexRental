@@ -7,8 +7,20 @@ CREATE TABLE IF NOT EXISTS customers (
     whatsapp TEXT,
     cnic TEXT,
     license_number TEXT,
-    address TEXT
+    address TEXT,
+    internal_remarks TEXT,
+    source TEXT,
+    reference_name TEXT,
+    reference_phone TEXT,
+    country TEXT
 );
+
+-- Ensure columns exist in case table was already created
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS internal_remarks TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS reference_name TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS reference_phone TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS country TEXT;
 
 -- 2. Create Drivers Table
 CREATE TABLE IF NOT EXISTS drivers (
@@ -17,9 +29,19 @@ CREATE TABLE IF NOT EXISTS drivers (
     name TEXT NOT NULL,
     phone TEXT,
     license_no TEXT,
+    license_expiry DATE,
+    cnic TEXT,
+    cnic_expiry DATE,
     status TEXT DEFAULT 'Available',
-    base_salary DECIMAL
+    base_salary DECIMAL,
+    internal_remarks TEXT
 );
+
+-- Ensure columns exist in case table was already created
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS cnic TEXT;
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS cnic_expiry DATE;
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_expiry DATE;
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS internal_remarks TEXT;
 
 -- 3. Update Vehicles Table
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS m_tag_balance DECIMAL DEFAULT 0;

@@ -199,9 +199,10 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
-        license_no: '',
         cnic: '',
+        cnic_expiry: '',
         license_expiry: '',
+        license_no: '',
         status: 'Available',
         base_salary: '',
         internal_remarks: '',
@@ -235,22 +236,28 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                     <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
                 </div>
                 <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">CNIC Expiry</label>
+                    <input type="date" name="cnic_expiry" value={formData.cnic_expiry} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">License No</label>
+                    <input name="license_no" value={formData.license_no} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" />
+                </div>
+                <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">License Expiry</label>
                     <input type="date" name="license_expiry" value={formData.license_expiry} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
                 </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-                <div className="flex-grow">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">status</label>
+                <div className="w-full">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
                     <select name="status" value={formData.status} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-white">
                         <option value="Available">Available</option>
                         <option value="On Trip">On Trip</option>
                         <option value="Inactive">Inactive</option>
                     </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">License No</label>
-                    <input name="license_no" value={formData.license_no} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono uppercase" required />
                 </div>
             </div>
             <div>

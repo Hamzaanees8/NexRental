@@ -16,8 +16,16 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   const [loading, setLoading] = useState(true);
 
   // Date Range Filtering
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  // Determine local date for default range
+  const getLocalISODate = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [startDate, setStartDate] = useState(getLocalISODate(new Date(Date.now() - 7 * 86400000)));
+  const [endDate, setEndDate] = useState(getLocalISODate(new Date()));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,7 +60,24 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   // Filtered Data
   const filteredDailyData = summary?.dailyData.filter(d => d.date >= startDate && d.date <= endDate) || [];
   const filteredRentals = rentals.filter(r => {
-    const rDate = r.start_time.split('T')[0];
+    // Get local date components from the timestamp
+    const localDate = new Date(r.start_time);
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    const rDate = `${year}-${month}-${day}`;
+
+    // Debug specific rental
+    if (r.id === "69efa5e7-c89a-4411-9525-39edfbfd0072") {
+      console.log("Rental Debug:", {
+        startTimeUTC: r.start_time,
+        localDateCalc: localDate.toString(),
+        extractedDate: rDate,
+        filterRange: `${startDate} to ${endDate}`,
+        isIncluded: rDate >= startDate && rDate <= endDate
+      });
+    }
+
     return rDate >= startDate && rDate <= endDate;
   });
   const filteredTrips = trips.filter(t => t.date >= startDate && t.date <= endDate);
@@ -63,6 +88,9 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
 
   const activeRentals = filteredRentals.filter(r => r.status === RentalStatus.Active).length;
   const reservedRentals = filteredRentals.filter(r => r.status === RentalStatus.Reserved).length;
+  const pipelineRevenue = filteredRentals
+    .filter(r => r.status === RentalStatus.Reserved || r.status === RentalStatus.Active || r.status === RentalStatus.Completed)
+    .reduce((sum, r) => sum + (r.rent_amount || 0), 0);
 
   const summaryChartData = [
     ...Object.values(TripStatus).map(status => ({
@@ -144,11 +172,10 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
           <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">{activeRentals} Active Currently</p>
         </Card>
         <Card>
-          <h4 className="text-sm font-medium text-slate-500">Avg. Revenue / Day</h4>
+          <h4 className="text-sm font-medium text-slate-500">Pipeline Revenue</h4>
           <p className="text-3xl font-bold text-orange-500">
-            {formatCurrency(filteredDailyData.length ? totalRevenueInRange / filteredDailyData.length : 0)}
+            {formatCurrency(pipelineRevenue)}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Based on selected range</p>
         </Card>
       </div>
 

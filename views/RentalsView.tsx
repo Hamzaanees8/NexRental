@@ -125,19 +125,24 @@ const RentalsView: React.FC = () => {
                 end_time: new Date(formData.end_time || '').toISOString(),
             };
 
+            console.log("Saving Rental Data:", dataToSave);
+
             if (selectedRental) {
-                await updateRental(selectedRental.id, dataToSave);
-                toast.success("Booking updated successfully");
+                const updated = await updateRental(selectedRental.id, dataToSave);
+                console.log("Update Result:", updated);
+                toast.success(`Booking updated! DB Time: ${updated.start_time}`);
             } else {
-                await createRental(dataToSave as any);
+                const created = await createRental(dataToSave as any);
+                console.log("Create Result:", created);
                 toast.success("Booking confirmed successfully");
             }
 
             setViewMode('list');
             setSelectedRental(null);
             loadData();
-        } catch (e) {
-            toast.error("Error saving rental");
+        } catch (e: any) {
+            console.error("Save Error Full:", e);
+            toast.error("Error saving: " + (e.message || "Unknown"));
         }
     }
 
