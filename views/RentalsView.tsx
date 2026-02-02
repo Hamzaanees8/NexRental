@@ -614,11 +614,9 @@ const RentalsView: React.FC = () => {
                             />
                         </div>
 
-                        {selectedRental && (
-                            <select className="w-full p-2 border rounded-xl bg-slate-50" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}>
-                                {Object.values(RentalStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        )}
+                        <select className="w-full p-2 border rounded-xl bg-slate-50" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}>
+                            {Object.values(RentalStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
 
                         <div className="pt-4 flex gap-4">
                             <button onClick={handleCreateOrUpdate} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition">
