@@ -29,6 +29,23 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
     }, []);
 
     const handleSave = async (formData: any) => {
+        // Validation
+        if (!formData.name || formData.name.trim().length < 3) {
+            alert("Name must be at least 3 characters long");
+            return;
+        }
+
+        const phoneRegex = /^\d{7,15}$/;
+        if (!phoneRegex.test(formData.phone)) {
+            alert("Please enter a valid phone number (7-15 digits)");
+            return;
+        }
+
+        if (formData.cnic && !/^\d{5}-\d{7}-\d{1}$/.test(formData.cnic) && !/^\d{13}$/.test(formData.cnic)) {
+            alert("CNIC should be in 00000-0000000-0 format or 13 digits");
+            return;
+        }
+
         if (editingCustomer) {
             await updateCustomer(editingCustomer.id, formData);
         } else {

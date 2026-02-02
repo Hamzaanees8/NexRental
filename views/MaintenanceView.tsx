@@ -47,6 +47,17 @@ const MaintenanceView: React.FC = () => {
   };
 
   const handleSaveRecord = async (formData: Omit<MaintenanceRecord, 'id' | 'tenant_id'>) => {
+    // Validation
+    if (!formData.vehicle_id) {
+      alert("Please select a vehicle");
+      return;
+    }
+
+    if (formData.cost <= 0) {
+      alert("Cost must be greater than 0");
+      return;
+    }
+
     try {
       if (selectedRecord) {
         await updateMaintenanceRecord(selectedRecord.id, formData);

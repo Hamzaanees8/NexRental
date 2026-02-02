@@ -61,6 +61,29 @@ const FleetView: React.FC = () => {
   };
 
   const handleSaveVehicle = async (formData: Omit<Vehicle, 'id' | 'tenant_id'>) => {
+    // Validation
+    const plateRegex = /^[A-Z0-9- ]+$/i;
+    if (!formData.license_plate || !plateRegex.test(formData.license_plate)) {
+      alert("Please enter a valid license plate (Alphanumeric and dashes only)");
+      return;
+    }
+
+    if (!formData.make_model || formData.make_model.trim().length < 3) {
+      alert("Make and Model must be at least 3 characters long");
+      return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    if (formData.year && (formData.year < 1950 || formData.year > currentYear + 1)) {
+      alert(`Please enter a valid year (1950 - ${currentYear + 1})`);
+      return;
+    }
+
+    if (formData.capacity <= 0) {
+      alert("Capacity must be greater than 0");
+      return;
+    }
+
     if (selectedVehicle) {
       await updateVehicle(selectedVehicle.id, formData);
     } else {

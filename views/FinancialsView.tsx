@@ -37,8 +37,17 @@ const FinancialsView: React.FC = () => {
   useEffect(() => {
     fetchFinancialData();
   }, []);
-
   const handleSaveExpense = async (formData: any) => {
+    // Validation
+    if (formData.amount <= 0) {
+      alert("Amount must be greater than 0");
+      return;
+    }
+    if (!formData.description) {
+      alert("Please provide a description or type");
+      return;
+    }
+
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, formData);
     } else {
@@ -50,6 +59,24 @@ const FinancialsView: React.FC = () => {
   };
 
   const handleSavePrivateHire = async (formData: any) => {
+    // Validation
+    if (!formData.vehicle_id) {
+      alert("Please select a vehicle");
+      return;
+    }
+    if (formData.amount <= 0) {
+      alert("Amount must be greater than 0");
+      return;
+    }
+    if (!formData.description) {
+      alert("Please provide a description");
+      return;
+    }
+    if (new Date(formData.end_date) < new Date(formData.date)) {
+      alert("End date cannot be before start date");
+      return;
+    }
+
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, formData);
     } else {

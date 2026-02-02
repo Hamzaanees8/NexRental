@@ -85,6 +85,26 @@ const RentalsView: React.FC = () => {
                 alert("Please fill all required fields (Vehicle, Customer/Partner, and Timing)");
                 return;
             }
+            if (new Date(formData.end_time || '') <= new Date(formData.start_time || '')) {
+                alert("End time must be after start time");
+                return;
+            }
+
+            if (formData.odometer_end && (formData.odometer_end < (formData.odometer_start || 0))) {
+                alert("Odometer end reading cannot be less than start reading");
+                return;
+            }
+
+            if ((formData.rent_amount || 0) < 0) {
+                alert("Rent amount cannot be negative");
+                return;
+            }
+
+            if ((formData.commission_amount || 0) < 0) {
+                alert("Commission amount cannot be negative");
+                return;
+            }
+
             if (formData.rental_type === RentalType.WithDriver && !formData.driver_id) {
                 alert("Please select a driver for 'With Driver' booking");
                 return;
