@@ -8,6 +8,14 @@ import SearchableSelect from '../components/SearchableSelect';
 import MultiSearchableSelect from '../components/MultiSearchableSelect';
 import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
 
+const formatDateForInput = (dateValue: string | Date | undefined) => {
+    if (!dateValue) return '';
+    const date = new Date(dateValue);
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+};
+
 const RentalsView: React.FC = () => {
     const [viewMode, setViewMode] = useState<'list' | 'create' | 'details'>('list');
     const [rentals, setRentals] = useState<Rental[]>([]);
@@ -22,8 +30,8 @@ const RentalsView: React.FC = () => {
     // Form State
     const [formData, setFormData] = useState<Partial<Rental>>({
         rental_type: RentalType.WithDriver,
-        start_time: new Date().toISOString().slice(0, 16),
-        end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+        start_time: formatDateForInput(new Date()),
+        end_time: formatDateForInput(new Date(Date.now() + 86400000)),
         rent_amount: 0,
         security_deposit: 0,
         driver_allowance: 0,
@@ -111,11 +119,17 @@ const RentalsView: React.FC = () => {
                 return;
             }
 
+            const dataToSave = {
+                ...formData,
+                start_time: new Date(formData.start_time || '').toISOString(),
+                end_time: new Date(formData.end_time || '').toISOString(),
+            };
+
             if (selectedRental) {
-                await updateRental(selectedRental.id, formData);
+                await updateRental(selectedRental.id, dataToSave);
                 toast.success("Booking updated successfully");
             } else {
-                await createRental(formData as any);
+                await createRental(dataToSave as any);
                 toast.success("Booking confirmed successfully");
             }
 
@@ -162,8 +176,8 @@ const RentalsView: React.FC = () => {
         setSelectedRental(rental);
         setFormData({
             ...rental,
-            start_time: new Date(rental.start_time).toISOString().slice(0, 16),
-            end_time: new Date(rental.end_time).toISOString().slice(0, 16),
+            start_time: formatDateForInput(rental.start_time),
+            end_time: formatDateForInput(rental.end_time),
             ride_expenses: rental.ride_expenses || [],
             allowed_cities: rental.allowed_cities || []
         });
@@ -174,8 +188,8 @@ const RentalsView: React.FC = () => {
         setSelectedRental(null);
         setFormData({
             rental_type: RentalType.WithDriver,
-            start_time: new Date().toISOString().slice(0, 16),
-            end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+            start_time: formatDateForInput(new Date()),
+            end_time: formatDateForInput(new Date(Date.now() + 86400000)),
             rent_amount: 0,
             security_deposit: 0,
             driver_allowance: 0,
@@ -481,7 +495,7 @@ const RentalsView: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={handleAddExpense}
-                                    className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-bold transition flex items-center gap-1"
+                                    className="text-xs bg-indigo-50 cursor-pointer text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-bold transition flex items-center gap-1"
                                 >
                                     <PlusIcon /> Add Expense
                                 </button>
