@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getTrips, getVehicles, getDrivers, createTrip, updateTripStatus, generateVoucher } from '../services/api';
+import toast from 'react-hot-toast';
 import { Trip, TripStatus, Vehicle, Driver, PassengerLog } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -50,20 +51,35 @@ const TripsView: React.FC = () => {
   };
 
   const handleSaveTrip = async (formData: Omit<Trip, 'id' | 'tenantId' | 'status'>) => {
-    await createTrip(formData);
-    fetchTrips();
-    handleCloseModals();
+    try {
+      await createTrip(formData);
+      toast.success("Trip scheduled successfully");
+      fetchTrips();
+      handleCloseModals();
+    } catch (error) {
+      toast.error("Failed to schedule trip");
+    }
   };
 
   const handleSaveVoucher = async (tripId: string, passengerLogs: PassengerLog[]) => {
-    await generateVoucher(tripId, passengerLogs);
-    fetchTrips();
-    handleCloseModals();
+    try {
+      await generateVoucher(tripId, passengerLogs);
+      toast.success("Voucher generated successfully");
+      fetchTrips();
+      handleCloseModals();
+    } catch (error) {
+      toast.error("Failed to save voucher");
+    }
   };
 
   const handleUpdateStatus = async (tripId: string, status: TripStatus) => {
-    await updateTripStatus(tripId, status);
-    fetchTrips();
+    try {
+      await updateTripStatus(tripId, status);
+      toast.success(`Trip status updated to ${status}`);
+      fetchTrips();
+    } catch (error) {
+      toast.error("Failed to update trip status");
+    }
   };
 
   return (
@@ -242,7 +258,7 @@ const TripFormModal: React.FC<TripFormModalProps> = ({ isOpen, onClose, onSave, 
     // Filter out empty or duplicate stops before saving
     const cleanedRoute = formData.route.filter((stop, index, self) => stop && self.indexOf(stop) === index);
     if (cleanedRoute.length < 2) {
-      alert("A route must have at least an origin and a destination.");
+      toast.error("A route must have at least an origin and a destination.");
       return;
     }
     onSave({ ...formData, route: cleanedRoute });

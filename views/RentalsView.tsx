@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType, CustomerSource } from '../types';
 import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental, getSettings, updateSettings } from '../services/api';
 import { formatCurrency, RIDE_EXPENSE_TYPES } from '../constants';
+import toast from 'react-hot-toast';
 import { PlusIcon } from '../components/icons';
 import SearchableSelect from '../components/SearchableSelect';
 import MultiSearchableSelect from '../components/MultiSearchableSelect';
@@ -82,45 +83,47 @@ const RentalsView: React.FC = () => {
     const handleCreateOrUpdate = async () => {
         try {
             if (!formData.vehicle_id || (!formData.customer_id && !formData.affiliated_id) || !formData.start_time || !formData.end_time) {
-                alert("Please fill all required fields (Vehicle, Customer/Partner, and Timing)");
+                toast.error("Please fill all required fields (Vehicle, Customer/Partner, and Timing)");
                 return;
             }
             if (new Date(formData.end_time || '') <= new Date(formData.start_time || '')) {
-                alert("End time must be after start time");
+                toast.error("End time must be after start time");
                 return;
             }
 
             if (formData.odometer_end && (formData.odometer_end < (formData.odometer_start || 0))) {
-                alert("Odometer end reading cannot be less than start reading");
+                toast.error("Odometer end reading cannot be less than start reading");
                 return;
             }
 
             if ((formData.rent_amount || 0) < 0) {
-                alert("Rent amount cannot be negative");
+                toast.error("Rent amount cannot be negative");
                 return;
             }
 
             if ((formData.commission_amount || 0) < 0) {
-                alert("Commission amount cannot be negative");
+                toast.error("Commission amount cannot be negative");
                 return;
             }
 
             if (formData.rental_type === RentalType.WithDriver && !formData.driver_id) {
-                alert("Please select a driver for 'With Driver' booking");
+                toast.error("Please select a driver for 'With Driver' booking");
                 return;
             }
 
             if (selectedRental) {
                 await updateRental(selectedRental.id, formData);
+                toast.success("Booking updated successfully");
             } else {
                 await createRental(formData as any);
+                toast.success("Booking confirmed successfully");
             }
 
             setViewMode('list');
             setSelectedRental(null);
             loadData();
         } catch (e) {
-            alert("Error saving rental");
+            toast.error("Error saving rental");
         }
     }
 
@@ -128,9 +131,10 @@ const RentalsView: React.FC = () => {
         if (!window.confirm("Are you sure you want to delete this rental?")) return;
         try {
             await deleteRental(id);
+            toast.success("Rental deleted successfully");
             loadData();
         } catch (e) {
-            alert("Failed to delete rental");
+            toast.error("Failed to delete rental");
         }
     }
 
@@ -138,6 +142,7 @@ const RentalsView: React.FC = () => {
         if (!quickCustomer.name || !quickCustomer.phone) return;
         try {
             const newCust = await createCustomer({ ...quickCustomer, tenant_id: '' } as any);
+            toast.success("Customer added successfully");
             await loadData();
             setFormData(prev => ({ ...prev, customer_id: newCust.id }));
             setIsQuickCustomerOpen(false);
@@ -149,7 +154,7 @@ const RentalsView: React.FC = () => {
                 reference_phone: ''
             });
         } catch (e) {
-            alert("Failed to create customer");
+            toast.error("Failed to create customer");
         }
     }
 

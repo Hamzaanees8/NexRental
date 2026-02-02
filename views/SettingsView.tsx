@@ -3,6 +3,7 @@ import Card from '../components/Card';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
 import { getSettings, updateSettings } from '../services/api';
+import toast from 'react-hot-toast';
 
 const SettingsView: React.FC = () => {
     const [locations, setLocations] = useState<string[]>([]);
@@ -35,9 +36,9 @@ const SettingsView: React.FC = () => {
                 locations,
                 per_km_cost: perKmCost
             });
-            alert('Settings saved successfully!');
+            toast.success('Settings saved successfully!');
         } catch (error) {
-            alert('Failed to save settings');
+            toast.error('Failed to save settings');
         } finally {
             setSaving(false);
         }

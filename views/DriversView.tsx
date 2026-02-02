@@ -3,6 +3,7 @@ import { getDrivers, createDriver, updateDriver, deleteDriver } from '../service
 import { Driver } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
+import toast from 'react-hot-toast';
 
 const DriversView: React.FC = () => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -30,30 +31,32 @@ const DriversView: React.FC = () => {
     const handleSave = async (formData: any) => {
         // Validation
         if (!formData.name || formData.name.trim().length < 3) {
-            alert("Name must be at least 3 characters long");
+            toast.error("Name must be at least 3 characters long");
             return;
         }
 
         const phoneRegex = /^\d{7,15}$/;
         if (!phoneRegex.test(formData.phone)) {
-            alert("Please enter a valid phone number (7-15 digits)");
+            toast.error("Please enter a valid phone number (7-15 digits)");
             return;
         }
 
         if (!formData.license_no) {
-            alert("License number is required");
+            toast.error("License number is required");
             return;
         }
 
         if (formData.cnic && !/^\d{5}-\d{7}-\d{1}$/.test(formData.cnic) && !/^\d{13}$/.test(formData.cnic)) {
-            alert("CNIC should be in 00000-0000000-0 format or 13 digits");
+            toast.error("CNIC should be in 00000-0000000-0 format or 13 digits");
             return;
         }
 
         if (editingDriver) {
             await updateDriver(editingDriver.id, formData);
+            toast.success("Driver details updated");
         } else {
             await createDriver(formData);
+            toast.success("Driver registered successfully");
         }
         fetchDrivers();
         setIsModalOpen(false);
@@ -64,9 +67,10 @@ const DriversView: React.FC = () => {
         if (!window.confirm("Are you sure you want to delete this driver?")) return;
         try {
             await deleteDriver(id);
+            toast.success("Driver record removed");
             fetchDrivers();
         } catch (error) {
-            alert("Failed to delete driver");
+            toast.error("Failed to delete driver");
         }
     };
 

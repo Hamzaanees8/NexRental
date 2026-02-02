@@ -92,12 +92,6 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
     return <div className="text-center p-10">Loading Dashboard...</div>;
   }
 
-  console.log("trips", trips);
-  console.log("rentals", rentals);
-  console.log("customers", customers);
-  console.log("vehicles", vehicles);
-  console.log("maintenanceRecords", maintenanceRecords);
-
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">

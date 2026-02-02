@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { PlusIcon } from '../components/icons';
 import { EXPENSE_TYPES, formatCurrency } from '../constants';
+import toast from 'react-hot-toast';
 
 const MaintenanceView: React.FC = () => {
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
@@ -49,25 +50,27 @@ const MaintenanceView: React.FC = () => {
   const handleSaveRecord = async (formData: Omit<MaintenanceRecord, 'id' | 'tenant_id'>) => {
     // Validation
     if (!formData.vehicle_id) {
-      alert("Please select a vehicle");
+      toast.error("Please select a vehicle");
       return;
     }
 
     if (formData.cost <= 0) {
-      alert("Cost must be greater than 0");
+      toast.error("Cost must be greater than 0");
       return;
     }
 
     try {
       if (selectedRecord) {
         await updateMaintenanceRecord(selectedRecord.id, formData);
+        toast.success("Record updated");
       } else {
         await createMaintenanceRecord(formData);
+        toast.success("Maintenance record added");
       }
       fetchMaintenanceData();
       handleCloseModal();
     } catch (error) {
-      alert("Failed to save record");
+      toast.error("Failed to save record");
     }
   };
 
@@ -75,9 +78,10 @@ const MaintenanceView: React.FC = () => {
     if (!window.confirm("Are you sure you want to delete this record?")) return;
     try {
       await deleteMaintenanceRecord(id);
+      toast.success("Record deleted");
       fetchMaintenanceData();
     } catch (error) {
-      alert("Failed to delete record");
+      toast.error("Failed to delete record");
     }
   };
 

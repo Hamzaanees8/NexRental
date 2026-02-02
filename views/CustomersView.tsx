@@ -4,6 +4,7 @@ import { Customer, CustomerSource } from '../types';
 import { PlusIcon } from '../components/icons';
 import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
 import { COUNTRIES } from '../countries';
+import toast from 'react-hot-toast';
 
 const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 'standard' }) => {
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -31,25 +32,27 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
     const handleSave = async (formData: any) => {
         // Validation
         if (!formData.name || formData.name.trim().length < 3) {
-            alert("Name must be at least 3 characters long");
+            toast.error("Name must be at least 3 characters long");
             return;
         }
 
         const phoneRegex = /^\d{7,15}$/;
         if (!phoneRegex.test(formData.phone)) {
-            alert("Please enter a valid phone number (7-15 digits)");
+            toast.error("Please enter a valid phone number (7-15 digits)");
             return;
         }
 
         if (formData.cnic && !/^\d{5}-\d{7}-\d{1}$/.test(formData.cnic) && !/^\d{13}$/.test(formData.cnic)) {
-            alert("CNIC should be in 00000-0000000-0 format or 13 digits");
+            toast.error("CNIC should be in 00000-0000000-0 format or 13 digits");
             return;
         }
 
         if (editingCustomer) {
             await updateCustomer(editingCustomer.id, formData);
+            toast.success("Customer updated successfully");
         } else {
             await createCustomer(formData);
+            toast.success("Customer created successfully");
         }
         fetchCustomers();
         setIsModalOpen(false);
@@ -60,9 +63,10 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
         if (!window.confirm("Are you sure you want to delete this customer?")) return;
         try {
             await deleteCustomer(id);
+            toast.success("Customer deleted successfully");
             fetchCustomers();
         } catch (error) {
-            alert("Failed to delete customer");
+            toast.error("Failed to delete customer");
         }
     };
 

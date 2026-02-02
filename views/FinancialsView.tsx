@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getTransactions, createExpense, getVehicles, createPrivateHire, updateTransaction } from '../services/api';
 import { Transaction, TransactionType, Vehicle, ContractType } from '../types';
 import { TRANSACTION_TYPE_COLORS, EXPENSE_TYPES, formatCurrency } from '../constants';
+import toast from 'react-hot-toast';
 
 const FinancialsView: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -40,18 +41,20 @@ const FinancialsView: React.FC = () => {
   const handleSaveExpense = async (formData: any) => {
     // Validation
     if (formData.amount <= 0) {
-      alert("Amount must be greater than 0");
+      toast.error("Amount must be greater than 0");
       return;
     }
     if (!formData.description) {
-      alert("Please provide a description or type");
+      toast.error("Please provide a description or type");
       return;
     }
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, formData);
+      toast.success("Expense updated");
     } else {
       await createExpense(formData);
+      toast.success("Expense recorded");
     }
     fetchFinancialData();
     setIsExpenseModalOpen(false);
@@ -61,26 +64,28 @@ const FinancialsView: React.FC = () => {
   const handleSavePrivateHire = async (formData: any) => {
     // Validation
     if (!formData.vehicle_id) {
-      alert("Please select a vehicle");
+      toast.error("Please select a vehicle");
       return;
     }
     if (formData.amount <= 0) {
-      alert("Amount must be greater than 0");
+      toast.error("Amount must be greater than 0");
       return;
     }
     if (!formData.description) {
-      alert("Please provide a description");
+      toast.error("Please provide a description");
       return;
     }
     if (new Date(formData.end_date) < new Date(formData.date)) {
-      alert("End date cannot be before start date");
+      toast.error("End date cannot be before start date");
       return;
     }
 
     if (editingTransaction) {
       await updateTransaction(editingTransaction.id, formData);
+      toast.success("Income record updated");
     } else {
       await createPrivateHire(formData);
+      toast.success("Income recorded successfully");
     }
     fetchFinancialData();
     setIsPrivateHireModalOpen(false);

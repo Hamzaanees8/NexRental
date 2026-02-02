@@ -11,6 +11,7 @@ import { MenuIcon, LogoIcon } from './components/icons';
 import CustomersView from './views/CustomersView';
 import DriversView from './views/DriversView';
 import SettingsView from './views/SettingsView';
+import { Toaster } from 'react-hot-toast';
 
 type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings';
 
@@ -47,6 +48,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden">
+      <Toaster position="top-right" />
       <Sidebar
         currentView={currentView}
         setCurrentView={setCurrentView}

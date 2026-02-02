@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { PlusIcon } from '../components/icons';
 import { STATUS_COLORS, VEHICLE_TYPES, formatCurrency } from '../constants';
+import toast from 'react-hot-toast';
 
 const FleetView: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -64,30 +65,32 @@ const FleetView: React.FC = () => {
     // Validation
     const plateRegex = /^[A-Z0-9- ]+$/i;
     if (!formData.license_plate || !plateRegex.test(formData.license_plate)) {
-      alert("Please enter a valid license plate (Alphanumeric and dashes only)");
+      toast.error("Please enter a valid license plate (Alphanumeric and dashes only)");
       return;
     }
 
     if (!formData.make_model || formData.make_model.trim().length < 3) {
-      alert("Make and Model must be at least 3 characters long");
+      toast.error("Make and Model must be at least 3 characters long");
       return;
     }
 
     const currentYear = new Date().getFullYear();
     if (formData.year && (formData.year < 1950 || formData.year > currentYear + 1)) {
-      alert(`Please enter a valid year (1950 - ${currentYear + 1})`);
+      toast.error(`Please enter a valid year (1950 - ${currentYear + 1})`);
       return;
     }
 
     if (formData.capacity <= 0) {
-      alert("Capacity must be greater than 0");
+      toast.error("Capacity must be greater than 0");
       return;
     }
 
     if (selectedVehicle) {
       await updateVehicle(selectedVehicle.id, formData);
+      toast.success("Vehicle updated");
     } else {
       await createVehicle(formData);
+      toast.success("Vehicle added to fleet");
     }
     fetchVehicles();
     handleCloseModal();
@@ -97,9 +100,10 @@ const FleetView: React.FC = () => {
     if (!window.confirm("Are you sure you want to delete this vehicle? All related maintenance and records will be affected.")) return;
     try {
       await deleteVehicle(id);
+      toast.success("Vehicle removed from fleet");
       fetchVehicles();
     } catch (error) {
-      alert("Failed to delete vehicle. Make sure it has no active rentals or trips.");
+      toast.error("Failed to delete vehicle. Make sure it has no active bookings.");
     }
   };
 
@@ -126,11 +130,12 @@ const FleetView: React.FC = () => {
     try {
       const type = mtagAction === 'add' ? TransactionType.MTagTopUp : TransactionType.MTagUsage;
       await updateMTagBalance(topUpVehicle.id, Number(topUpAmount), type, mtagDate);
+      toast.success(`M-Tag balance ${mtagAction === 'add' ? 'topped up' : 'adjusted'}`);
       setIsTopUpOpen(false);
       setTopUpVehicle(null);
       fetchVehicles(); // Refresh data
     } catch (e) {
-      alert("Update failed");
+      toast.error("Update failed");
     }
   }
 
@@ -138,6 +143,7 @@ const FleetView: React.FC = () => {
     if (!window.confirm("Remove this transaction? This will also revert the vehicle's balance.")) return;
     try {
       await deleteMTagTransaction(txId);
+      toast.success("Transaction removed");
       await fetchVehicles(); // Refresh both vehicles (balance) and transactions (history)
 
       // Update local history display if we're still in the modal
@@ -145,7 +151,7 @@ const FleetView: React.FC = () => {
         setMtagHistory(prev => prev.filter(h => h.id !== txId));
       }
     } catch (e) {
-      alert("Delete failed");
+      toast.error("Delete failed");
     }
   }
 
@@ -162,7 +168,7 @@ const FleetView: React.FC = () => {
         ));
       }
     } catch (e) {
-      alert("Edit failed");
+      toast.error("Edit failed");
     }
   }
 
