@@ -86,11 +86,18 @@ const FinancialsView: React.FC = () => {
     type === TransactionType.MTagTopUp;
 
   const totalRevenue = transactions
-    .filter(t => !isExpenseType(t.type))
+    .filter(t =>
+      t.type === TransactionType.Voucher ||
+      t.type === TransactionType.PrivateHire ||
+      t.type === TransactionType.RentalIncome
+    )
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalExpenses = transactions
-    .filter(t => isExpenseType(t.type))
+    .filter(t =>
+      t.type === TransactionType.Expense ||
+      t.type === TransactionType.TripExpense
+    )
     .reduce((sum, t) => sum + t.amount, 0);
 
   const netProfit = totalRevenue - totalExpenses;

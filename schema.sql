@@ -8,7 +8,8 @@ CREATE TABLE vehicles (
     license_plate TEXT,
     tenant_id TEXT,
     driver BOOLEAN,
-    rental_rate DECIMAL
+    rental_rate DECIMAL,
+    m_tag_id TEXT
 );
 
 -- Create the trips table

@@ -27,6 +27,7 @@ export interface Vehicle {
   year?: number;
   insurance_expiry?: string; // ISO date string
   token_tax_expiry?: string;  // ISO date string
+  m_tag_id?: string;
 }
 
 export interface Customer {
@@ -42,6 +43,7 @@ export interface Customer {
   source?: CustomerSource;
   reference_name?: string;
   reference_phone?: string;
+  country?: string;
 }
 
 export interface Driver {
@@ -111,6 +113,7 @@ export interface Rental {
   tenant_id: string;
   vehicle_id: string;
   customer_id: string;
+  affiliated_id?: string;
   driver_id?: string; // Nullable if Self Drive
   rental_type: RentalType; // Changed from type to match DB
   status: RentalStatus;
@@ -155,6 +158,7 @@ export enum TransactionType {
   PrivateHire = 'Private Hire',
   Expense = 'Expense',
   MTagTopUp = 'M-Tag TopUp',
+  MTagUsage = 'M-Tag Usage',
   RentalIncome = 'Rental Income',
   TripExpense = 'Trip Expense' // Fuel, Tolls etc specific to a rental
 }

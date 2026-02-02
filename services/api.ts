@@ -186,13 +186,17 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
     }
     const isExpenseType = 
       t.type === TransactionType.Expense || 
-      t.type === TransactionType.MTagTopUp || 
       t.type === TransactionType.TripExpense;
+    
+    const isRevenueType = 
+      t.type === TransactionType.Voucher || 
+      t.type === TransactionType.PrivateHire || 
+      t.type === TransactionType.RentalIncome;
 
     if (isExpenseType) {
       summary.totalCosts += t.amount;
       dailyMap[dateStr].costs += t.amount;
-    } else {
+    } else if (isRevenueType) {
       summary.totalRevenue += t.amount;
       dailyMap[dateStr].revenue += t.amount;
     }
@@ -309,6 +313,14 @@ export const updateMaintenanceRecord = async (
     .eq("id", id)
     .select();
   if (error) throw new Error(error.message);
+
+  // // If odometer was updated, sync it to the vehicle
+  // if (updates.odometer && data[0]?.vehicle_id) {
+  //   await updateVehicle(data[0].vehicle_id, {
+  //     current_odometer: updates.odometer,
+  //   });
+  // }
+
   return data[0] as MaintenanceRecord;
 };
 
@@ -346,6 +358,13 @@ export const createMaintenanceRecord = async (
     vehicle_id: newRecord.vehicle_id,
   };
   await createExpense(newTransaction);
+
+  // // Update vehicle's current_odometer if provided in the maintenance record
+  // if (newRecord.odometer) {
+  //   await updateVehicle(newRecord.vehicle_id, {
+  //     current_odometer: newRecord.odometer,
+  //   });
+  // }
 
   return data[0] as MaintenanceRecord;
 };
@@ -651,9 +670,11 @@ export const completeRental = async (
 };
 
 // M-Tag Wallet
-export const topUpMTag = async (
+export const updateMTagBalance = async (
   vehicleId: string,
-  amount: number
+  amount: number,
+  type: TransactionType.MTagTopUp | TransactionType.MTagUsage,
+  date?: string
 ): Promise<Vehicle> => {
   // 1. Get current vehicle
   const { data: vehicle, error: fetchError } = await supabase
@@ -664,7 +685,11 @@ export const topUpMTag = async (
   if (fetchError || !vehicle) throw new Error("Vehicle not found");
 
   // 2. Update Balance
-  const newBalance = (vehicle.m_tag_balance || 0) + amount;
+  const isUsage = type === TransactionType.MTagUsage;
+  const newBalance = isUsage 
+    ? (vehicle.m_tag_balance || 0) - amount 
+    : (vehicle.m_tag_balance || 0) + amount;
+
   const { data: updatedVehicle, error: updateError } = await supabase
     .from("vehicles")
     .update({ m_tag_balance: newBalance })
@@ -674,19 +699,115 @@ export const topUpMTag = async (
 
   if (updateError) throw new Error(updateError.message);
 
-  // 3. Log Transaction (Expense)
+  // 3. Log Transaction
   await supabase.from("financial_transactions").insert([
     {
       tenant_id: TENANT_ID,
       vehicle_id: vehicleId,
-      type: TxType.MTagTopUp,
+      type: type,
       amount: amount,
-      description: `M-Tag Top Up for ${vehicle.license_plate}`,
-      date: new Date().toISOString(),
+      description: isUsage 
+        ? `M-Tag Usage deduction for ${vehicle.license_plate}` 
+        : `M-Tag Top Up for ${vehicle.license_plate}`,
+      date: date || new Date().toISOString(),
     },
   ]);
 
   return updatedVehicle as Vehicle;
+};
+
+// Deprecated alias for compatibility
+export const topUpMTag = (vehicleId: string, amount: number) => 
+  updateMTagBalance(vehicleId, amount, TransactionType.MTagTopUp);
+
+export const deleteMTagTransaction = async (transactionId: string): Promise<void> => {
+  // 1. Get transaction details
+  const { data: tx, error: txError } = await supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .single();
+  
+  if (txError || !tx) throw new Error("Transaction not found");
+  if (!tx.vehicle_id) throw new Error("Transaction not associated with a vehicle");
+
+  // 2. Reverse balance update
+  const { data: vehicle, error: vError } = await supabase
+    .from("vehicles")
+    .select("m_tag_balance")
+    .eq("id", tx.vehicle_id)
+    .single();
+  
+  if (vError || !vehicle) throw new Error("Vehicle not found");
+
+  const isUsage = tx.type === TransactionType.MTagUsage;
+  // If it was usage (subtracted), we add it back. If it was topup (added), we subtract it.
+  const correctedBalance = isUsage 
+    ? (vehicle.m_tag_balance || 0) + tx.amount 
+    : (vehicle.m_tag_balance || 0) - tx.amount;
+
+  await supabase
+    .from("vehicles")
+    .update({ m_tag_balance: correctedBalance })
+    .eq("id", tx.vehicle_id);
+
+  // 3. Delete transaction
+  const { error: delError } = await supabase
+    .from("financial_transactions")
+    .delete()
+    .eq("id", transactionId);
+  
+  if (delError) throw new Error(delError.message);
+};
+
+export const editMTagTransaction = async (
+  transactionId: string,
+  newAmount: number,
+  newDate: string
+): Promise<void> => {
+  // 1. Get original transaction
+  const { data: tx, error: txError } = await supabase
+    .from("financial_transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .single();
+  
+  if (txError || !tx) throw new Error("Transaction not found");
+  if (!tx.vehicle_id) throw new Error("Transaction not associated with a vehicle");
+
+  // 2. Sync balance
+  const { data: vehicle, error: vError } = await supabase
+    .from("vehicles")
+    .select("m_tag_balance")
+    .eq("id", tx.vehicle_id)
+    .single();
+  
+  if (vError || !vehicle) throw new Error("Vehicle not found");
+
+  const isUsage = tx.type === TransactionType.MTagUsage;
+  
+  // First reverse old amount
+  let tempBalance = isUsage 
+    ? (vehicle.m_tag_balance || 0) + tx.amount 
+    : (vehicle.m_tag_balance || 0) - tx.amount;
+  
+  // Then apply new amount
+  const finalBalance = isUsage 
+    ? tempBalance - newAmount 
+    : tempBalance + newAmount;
+
+  await supabase
+    .from("vehicles")
+    .update({ m_tag_balance: finalBalance })
+    .eq("id", tx.vehicle_id);
+
+  // 3. Update transaction record
+  const { error: updError } = await supabase
+    .from("financial_transactions")
+    .update({ amount: newAmount, date: newDate })
+    .eq("id", transactionId);
+  
+  if (updError) throw new Error(updError.message);
 };
 
 // Settings

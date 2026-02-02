@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS drivers (
 -- 3. Update Vehicles Table
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS m_tag_balance DECIMAL DEFAULT 0;
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS current_odometer INTEGER DEFAULT 0;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS m_tag_id TEXT;
 -- Fix: Ensure license_plate exists if it was named differently, but schema.sql says it is license_plate.
 
 -- 4. Update Maintenance Records Table (Fix mismatches)

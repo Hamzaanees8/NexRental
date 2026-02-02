@@ -45,6 +45,7 @@ const RentalsView: React.FC = () => {
         ride_expenses: [],
         inspection_notes: '',
         commission_amount: 0,
+        affiliated_id: '',
         allowed_cities: []
     });
 
@@ -80,8 +81,8 @@ const RentalsView: React.FC = () => {
 
     const handleCreateOrUpdate = async () => {
         try {
-            if (!formData.vehicle_id || !formData.customer_id || !formData.start_time || !formData.end_time) {
-                alert("Please fill all required fields");
+            if (!formData.vehicle_id || (!formData.customer_id && !formData.affiliated_id) || !formData.start_time || !formData.end_time) {
+                alert("Please fill all required fields (Vehicle, Customer/Partner, and Timing)");
                 return;
             }
             if (formData.rental_type === RentalType.WithDriver && !formData.driver_id) {
@@ -172,6 +173,7 @@ const RentalsView: React.FC = () => {
             ride_expenses: [],
             inspection_notes: '',
             commission_amount: 0,
+            affiliated_id: '',
             allowed_cities: []
         });
         setViewMode('create');
@@ -236,6 +238,8 @@ const RentalsView: React.FC = () => {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {rentals.map(rental => {
                         const customer = customers.find(c => c.id === rental.customer_id);
+                        const affiliate = customers.find(c => c.id === rental.affiliated_id);
+                        const displayName = customer?.name || affiliate?.name || 'Unknown';
                         const vehicle = vehicles.find(v => v.id === rental.vehicle_id);
                         const isWithDriver = rental.rental_type === RentalType.WithDriver;
 
@@ -259,7 +263,7 @@ const RentalsView: React.FC = () => {
                                     </span>
                                     <span className="text-xs text-slate-500 font-mono">{new Date(rental.start_time).toLocaleDateString()}</span>
                                 </div>
-                                <h3 className="font-bold text-lg text-slate-800">{customer?.name || 'Unknown'}</h3>
+                                <h3 className="font-bold text-lg text-slate-800">{displayName}</h3>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-sm font-mono bg-slate-100 px-1.5 rounded">{vehicle?.license_plate}</span>
                                     <span className="text-xs text-slate-500 uppercase">{vehicle?.type}</span>
@@ -272,7 +276,14 @@ const RentalsView: React.FC = () => {
                                             <span className="text-[10px] text-orange-600 font-bold italic mt-0.5">Gur: {rental.guarantor_name}</span>
                                         )}
                                     </div>
+
                                     <div className="flex flex-col text-right">
+                                        {(rental.odometer_end && rental.odometer_start) ? (
+                                            <div className="mb-2">
+                                                <p className="text-[10px] text-slate-400 uppercase font-bold">Mileage</p>
+                                                <p className="text-xs font-mono font-bold text-indigo-600">{(rental.odometer_end - rental.odometer_start).toLocaleString()} km</p>
+                                            </div>
+                                        ) : null}
                                         <span className="text-xs text-slate-400">Rent</span>
                                         <span className="font-mono font-bold text-blue-600">
                                             {formatCurrency(rental.rent_amount)}
@@ -315,7 +326,14 @@ const RentalsView: React.FC = () => {
                                         label: `(${v.type}) ${v.license_plate}`
                                     }))}
                                     value={formData.vehicle_id || ''}
-                                    onChange={(val) => setFormData({ ...formData, vehicle_id: val })}
+                                    onChange={(val) => {
+                                        const vehicle = vehicles.find(v => v.id === val);
+                                        setFormData({
+                                            ...formData,
+                                            vehicle_id: val,
+                                            odometer_start: vehicle?.current_odometer || formData.odometer_start
+                                        });
+                                    }}
                                     placeholder="Search Vehicle..."
                                 />
                             </div>
@@ -324,9 +342,14 @@ const RentalsView: React.FC = () => {
                                 <div className="flex gap-2">
                                     <div className="flex-1">
                                         <SearchableSelect
-                                            options={customers.map(c => ({ value: c.id, label: c.name }))}
+                                            options={customers.filter(c => c.source !== CustomerSource.Affiliated).map(c => ({ value: c.id, label: c.name }))}
                                             value={formData.customer_id || ''}
-                                            onChange={(val) => setFormData({ ...formData, customer_id: val })}
+                                            onChange={(val) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    customer_id: val
+                                                }));
+                                            }}
                                             placeholder="Search Customer..."
                                         />
                                     </div>
@@ -335,6 +358,21 @@ const RentalsView: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                        <div className="">
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Affiliate Partner (Booking Source)</label>
+                            <SearchableSelect
+                                options={customers.filter(c => c.source === CustomerSource.Affiliated).map(c => ({ value: c.id, label: c.name }))}
+                                value={formData.affiliated_id || ''}
+                                onChange={(val) => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        affiliated_id: val
+                                    }));
+                                }}
+                                placeholder="Pick an Affiliate Partner"
+                                className="border-purple-200"
+                            />
                         </div>
 
                         {formData.rental_type === RentalType.WithDriver ? (
@@ -379,7 +417,7 @@ const RentalsView: React.FC = () => {
                         </div>
 
                         {/* Odometer Section */}
-                        <div className="grid grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="grid grid-cols-3 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Odometer Start</label>
                                 <input
@@ -398,6 +436,15 @@ const RentalsView: React.FC = () => {
                                     className="w-full p-2 border rounded-lg bg-white font-mono"
                                     value={formData.odometer_end || ''}
                                     onChange={e => setFormData({ ...formData, odometer_end: Math.max(0, Number(e.target.value)) })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-indigo-500 uppercase mb-2">Total Mileage</label>
+                                <input
+                                    type="number"
+                                    disabled
+                                    className="w-full p-2 border rounded-lg bg-indigo-50 font-mono font-bold text-indigo-700"
+                                    value={Math.max(0, (formData.odometer_end || 0) - (formData.odometer_start || 0))}
                                 />
                             </div>
                         </div>
@@ -488,32 +535,34 @@ const RentalsView: React.FC = () => {
 
                             {(() => {
                                 const selectedCustomer = customers.find(c => c.id === formData.customer_id);
-                                if (selectedCustomer?.source === CustomerSource.Affiliated) {
+                                const selectedAffiliate = customers.find(c => c.id === formData.affiliated_id);
+
+                                if (selectedAffiliate || selectedCustomer?.source === CustomerSource.Affiliated) {
                                     return (
                                         <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                                             <label className="block text-sm font-bold text-purple-800 mb-1">Commission Amount</label>
                                             <input type="number" className="w-full p-2 border rounded-xl bg-white font-mono text-purple-700" value={formData.commission_amount || ''} onChange={e => setFormData({ ...formData, commission_amount: Number(e.target.value) })} />
-                                            <p className="text-[10px] text-purple-400 mt-1 font-bold uppercase italic">Affiliate Customer</p>
+                                            <p className="text-[10px] text-purple-400 mt-1 font-bold uppercase italic">Affiliate Booking</p>
                                         </div>
                                     );
                                 }
-                                if (selectedCustomer?.source === CustomerSource.Reference) {
-                                    return (
-                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                                            <label className="block text-sm font-bold text-orange-800 mb-2">Referrer Details</label>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="bg-white p-2 rounded-lg border border-orange-200">
-                                                    <p className="text-[10px] text-orange-400 font-bold uppercase">Name</p>
-                                                    <p className="font-medium text-slate-800">{selectedCustomer.reference_name || 'N/A'}</p>
-                                                </div>
-                                                <div className="bg-white p-2 rounded-lg border border-orange-200">
-                                                    <p className="text-[10px] text-orange-400 font-bold uppercase">Phone</p>
-                                                    <p className="font-mono font-medium text-slate-800">{selectedCustomer.reference_phone || 'N/A'}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }
+                                // if (selectedCustomer?.source === CustomerSource.Reference) {
+                                //     return (
+                                //         <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                //             <label className="block text-sm font-bold text-orange-800 mb-2">Referrer Details</label>
+                                //             <div className="grid grid-cols-2 gap-4">
+                                //                 <div className="bg-white p-2 rounded-lg border border-orange-200">
+                                //                     <p className="text-[10px] text-orange-400 font-bold uppercase">Name</p>
+                                //                     <p className="font-medium text-slate-800">{selectedCustomer.reference_name || 'N/A'}</p>
+                                //                 </div>
+                                //                 <div className="bg-white p-2 rounded-lg border border-orange-200">
+                                //                     <p className="text-[10px] text-orange-400 font-bold uppercase">Phone</p>
+                                //                     <p className="font-mono font-medium text-slate-800">{selectedCustomer.reference_phone || 'N/A'}</p>
+                                //                 </div>
+                                //             </div>
+                                //         </div>
+                                //     );
+                                // }
                                 return null;
                             })()}
                         </div>

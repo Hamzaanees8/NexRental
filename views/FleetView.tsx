@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getVehicles, createVehicle, updateVehicle, deleteVehicle, topUpMTag } from '../services/api';
-import { Vehicle, VehicleStatus } from '../types';
+import { getVehicles, createVehicle, updateVehicle, deleteVehicle, updateMTagBalance, getTransactions, deleteMTagTransaction, editMTagTransaction } from '../services/api';
+import { Vehicle, VehicleStatus, TransactionType } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -22,12 +22,23 @@ const FleetView: React.FC = () => {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
   const [topUpVehicle, setTopUpVehicle] = useState<Vehicle | null>(null);
+  const [mtagAction, setMtagAction] = useState<'add' | 'spend'>('add');
+  const [mtagDate, setMtagDate] = useState(new Date().toISOString().split('T')[0]);
+  const [mtagHistory, setMtagHistory] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState<number>(0);
+  const [editDate, setEditDate] = useState<string>('');
 
   const fetchVehicles = async () => {
     setLoading(true);
     try {
-      const data = await getVehicles();
-      setVehicles(data);
+      const [vData, tData] = await Promise.all([
+        getVehicles(),
+        getTransactions()
+      ]);
+      setVehicles(vData);
+      setTransactions(tData);
     } catch (error) {
       console.error("Failed to fetch vehicles:", error);
     } finally {
@@ -73,18 +84,62 @@ const FleetView: React.FC = () => {
     e.stopPropagation();
     setTopUpVehicle(vehicle);
     setTopUpAmount('');
+    setMtagAction('add');
+    setMtagDate(new Date().toISOString().split('T')[0]);
+
+    // Filter history for this vehicle
+    const history = transactions
+      .filter(t => t.vehicle_id === vehicle.id &&
+        (t.type === TransactionType.MTagTopUp || t.type === TransactionType.MTagUsage))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+    setMtagHistory(history);
+
     setIsTopUpOpen(true);
   }
 
   const handleTopUp = async () => {
     if (!topUpVehicle || !topUpAmount) return;
     try {
-      await topUpMTag(topUpVehicle.id, Number(topUpAmount));
+      const type = mtagAction === 'add' ? TransactionType.MTagTopUp : TransactionType.MTagUsage;
+      await updateMTagBalance(topUpVehicle.id, Number(topUpAmount), type, mtagDate);
       setIsTopUpOpen(false);
       setTopUpVehicle(null);
       fetchVehicles(); // Refresh data
     } catch (e) {
-      alert("Top up failed");
+      alert("Update failed");
+    }
+  }
+
+  const handleDeleteMTagTx = async (txId: string) => {
+    if (!window.confirm("Remove this transaction? This will also revert the vehicle's balance.")) return;
+    try {
+      await deleteMTagTransaction(txId);
+      await fetchVehicles(); // Refresh both vehicles (balance) and transactions (history)
+
+      // Update local history display if we're still in the modal
+      if (topUpVehicle) {
+        setMtagHistory(prev => prev.filter(h => h.id !== txId));
+      }
+    } catch (e) {
+      alert("Delete failed");
+    }
+  }
+
+  const handleEditMTagTx = async (txId: string) => {
+    try {
+      await editMTagTransaction(txId, editAmount, editDate);
+      setEditingTransactionId(null);
+      await fetchVehicles();
+
+      // Update local history display
+      if (topUpVehicle) {
+        setMtagHistory(prev => prev.map(h =>
+          h.id === txId ? { ...h, amount: editAmount, date: editDate } : h
+        ));
+      }
+    } catch (e) {
+      alert("Edit failed");
     }
   }
 
@@ -136,13 +191,13 @@ const FleetView: React.FC = () => {
               >
                 ✎
               </button>
-              {/* <button
+              <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(vehicle.id); }}
                 className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                 title="Delete"
               >
                 🗑
-              </button> */}
+              </button>
             </div>
             <div className="flex justify-between items-start mb-3">
               <div>
@@ -186,6 +241,9 @@ const FleetView: React.FC = () => {
                     + Add
                   </button>
                 </div>
+                {vehicle.m_tag_id && (
+                  <p className="text-[10px] text-slate-400 mt-1 font-mono">ID: {vehicle.m_tag_id}</p>
+                )}
               </div>
 
               <div className="flex flex-col items-end">
@@ -228,30 +286,127 @@ const FleetView: React.FC = () => {
         isTopUpOpen && topUpVehicle && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsTopUpOpen(false)}>
             <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-bold mb-2 text-slate-800">Top Up M-Tag</h3>
-              <div className="p-2.5 bg-blue-50 rounded-lg mb-6">
+              <h3 className="text-xl font-bold mb-2 text-slate-800">Manage M-Tag</h3>
+              <div className="p-2.5 bg-blue-50 rounded-lg mb-4">
                 <p className="text-xs text-blue-600 uppercase font-bold mb-1">Vehicle</p>
-                <p className="font-mono font-bold text-blue-900 text-lg">{topUpVehicle.license_plate}</p>
-                <p className="text-blue-700 text-sm">Current: {formatCurrency(topUpVehicle.m_tag_balance || 0)}</p>
+                <div className="flex justify-between items-center">
+                  <p className="font-mono font-bold text-blue-900 text-lg">{topUpVehicle.license_plate}</p>
+                  <p className="text-blue-700 text-sm font-bold">{formatCurrency(topUpVehicle.m_tag_balance || 0)}</p>
+                </div>
               </div>
 
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Amount to Add</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full p-2 border-2 border-slate-200 rounded-xl font-mono text-2xl focus:border-blue-500 focus:ring-0 transition"
-                  placeholder="1000"
-                  value={topUpAmount}
-                  onChange={e => setTopUpAmount(Math.max(0, Number(e.target.value)))}
-                  autoFocus
-                />
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setMtagAction('add')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${mtagAction === 'add' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`}
+                >
+                  + Add Funds
+                </button>
+                <button
+                  onClick={() => setMtagAction('spend')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${mtagAction === 'spend' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}`}
+                >
+                  - Record Spend
+                </button>
               </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Amount</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full p-2 border-2 border-slate-100 rounded-lg font-mono text-xl focus:border-blue-500 outline-none"
+                    placeholder="1000"
+                    value={topUpAmount}
+                    onChange={e => setTopUpAmount(Math.max(0, Number(e.target.value)))}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
+                  <input
+                    type="date"
+                    className="w-full p-2 border-2 border-slate-100 rounded-lg text-sm focus:border-blue-500 outline-none"
+                    value={mtagDate}
+                    onChange={e => setMtagDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* History Section */}
+              {mtagHistory.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Recent History</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {mtagHistory.map(h => (
+                      <div key={h.id} className="group/item flex flex-col p-2 bg-slate-50 rounded-lg border border-slate-100 shadow-sm transition hover:bg-white hover:border-slate-200">
+                        {editingTransactionId === h.id ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                className="w-full text-xs p-1 border rounded"
+                                value={editAmount}
+                                onChange={e => setEditAmount(Number(e.target.value))}
+                              />
+                              <input
+                                type="date"
+                                className="w-full text-xs p-1 border rounded"
+                                value={editDate}
+                                onChange={e => setEditDate(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={() => handleEditMTagTx(h.id)} className="flex-1 bg-green-600 text-white text-[10px] py-1 rounded font-bold">Save</button>
+                              <button onClick={() => setEditingTransactionId(null)} className="flex-1 bg-slate-200 text-slate-600 text-[10px] py-1 rounded">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-700">{new Date(h.date).toLocaleDateString()}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{h.type === TransactionType.MTagTopUp ? 'RELOAD' : 'USAGE'}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`font-mono font-bold ${h.type === TransactionType.MTagTopUp ? 'text-green-600' : 'text-orange-600'}`}>
+                                {h.type === TransactionType.MTagTopUp ? '+' : '-'}{formatCurrency(h.amount)}
+                              </span>
+                              <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition px-1 border-l pl-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingTransactionId(h.id);
+                                    setEditAmount(h.amount);
+                                    setEditDate(new Date(h.date).toISOString().split('T')[0]);
+                                  }}
+                                  className="text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                                >
+                                  ✎
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMTagTx(h.id)}
+                                  className="text-slate-400 hover:text-red-600 transition cursor-pointer"
+                                >
+                                  🗑
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2.5">
-                <button onClick={() => setIsTopUpOpen(false)} className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition cursor-pointer">Cancel</button>
-                <button onClick={handleTopUp} disabled={!topUpAmount} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 transition active:scale-95 cursor-pointer">
-                  Confirm
+                <button onClick={() => setIsTopUpOpen(false)} className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition cursor-pointer">Cancel</button>
+                <button
+                  onClick={handleTopUp}
+                  disabled={!topUpAmount}
+                  className={`flex-1 py-3 text-white rounded-xl font-bold shadow-lg disabled:opacity-50 transition active:scale-95 cursor-pointer ${mtagAction === 'add' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                >
+                  Confirm Change
                 </button>
               </div>
             </div>
@@ -277,7 +432,8 @@ const VehicleForm: React.FC<{
     make_model: '',
     year: new Date().getFullYear(),
     insurance_expiry: '',
-    token_tax_expiry: ''
+    token_tax_expiry: '',
+    m_tag_id: ''
   });
 
   useEffect(() => {
@@ -291,7 +447,8 @@ const VehicleForm: React.FC<{
         make_model: vehicle.make_model || '',
         year: vehicle.year || new Date().getFullYear(),
         insurance_expiry: vehicle.insurance_expiry || '',
-        token_tax_expiry: vehicle.token_tax_expiry || ''
+        token_tax_expiry: vehicle.token_tax_expiry || '',
+        m_tag_id: vehicle.m_tag_id || ''
       });
     }
   }, [vehicle]);
@@ -349,6 +506,10 @@ const VehicleForm: React.FC<{
           <label className="block text-sm font-bold text-slate-700 mb-1">Token Tax Expiry</label>
           <input type="date" name="token_tax_expiry" value={formData.token_tax_expiry} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" />
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">M-Tag ID</label>
+        <input type="text" name="m_tag_id" value={formData.m_tag_id} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" placeholder="Enter M-Tag ID" />
       </div>
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>

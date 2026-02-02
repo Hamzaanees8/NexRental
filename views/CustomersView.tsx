@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../services/api';
 import { Customer, CustomerSource } from '../types';
 import { PlusIcon } from '../components/icons';
+import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
+import { COUNTRIES } from '../countries';
 
-const CustomersView: React.FC = () => {
+const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 'standard' }) => {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,10 +59,15 @@ const CustomersView: React.FC = () => {
         setIsModalOpen(true);
     }
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm)
-    );
+    const filteredCustomers = customers.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.phone.includes(searchTerm);
+
+        if (mode === 'affiliated') {
+            return matchesSearch && c.source === CustomerSource.Affiliated;
+        }
+        return matchesSearch && c.source !== CustomerSource.Affiliated;
+    });
 
     if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading Customers...</div>;
 
@@ -69,14 +76,14 @@ const CustomersView: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col px-4 rounded-lg sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 py-4 shadow-sm">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-800">Customers</h1>
-                    <p className="text-sm text-slate-500">{customers.length} Active Records</p>
+                    <h1 className="text-3xl font-bold text-slate-800">{mode === 'affiliated' ? 'Affiliated' : 'Direct'} Customers</h1>
+                    <p className="text-sm text-slate-500">{filteredCustomers.length} Active Records</p>
                 </div>
                 <button
                     onClick={openCreateModal}
                     className="w-full sm:w-auto bg-blue-600 cursor-pointer text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center font-bold"
                 >
-                    <PlusIcon className="mr-2" /> Add Customer
+                    <PlusIcon className="mr-2" /> Add {mode === 'affiliated' ? 'Affiliated' : 'Customer'}
                 </button>
             </div>
 
@@ -104,18 +111,19 @@ const CustomersView: React.FC = () => {
                             >
                                 ✎
                             </button>
-                            {/* <button
+                            <button
                                 onClick={() => handleDelete(customer.id)}
                                 className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                 title="Delete"
                             >
                                 🗑
-                            </button> */}
+                            </button>
                         </div>
                         <h3 className="font-bold text-lg text-slate-800">{customer.name}</h3>
                         <div className="flex flex-wrap gap-2 text-slate-500 text-sm font-mono mb-2">
                             <span>{customer.phone}</span>
                             {customer.whatsapp && <span className="text-green-600">| WA: {customer.whatsapp}</span>}
+                            {customer.country && <span className="text-slate-400">| {customer.country}</span>}
                             {customer.source && (
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${customer.source === CustomerSource.Affiliated ? 'bg-purple-100 text-purple-700' :
                                     customer.source === CustomerSource.Reference ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
@@ -157,7 +165,7 @@ const CustomersView: React.FC = () => {
                             <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-800 text-2xl leading-none cursor-pointer rounded-lg p-1 hover:bg-slate-200 transition">&times;</button>
                         </div>
                         <div className="p-6">
-                            <CustomerForm onSave={handleSave} initialData={editingCustomer || {}} />
+                            <CustomerForm onSave={handleSave} initialData={editingCustomer || {}} mode={mode} />
                         </div>
                     </div>
                 </div>
@@ -166,7 +174,7 @@ const CustomersView: React.FC = () => {
     );
 };
 
-const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = ({ onSave, initialData }) => {
+const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any, mode?: 'standard' | 'affiliated' }> = ({ onSave, initialData, mode = 'standard' }) => {
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
@@ -175,13 +183,14 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
         address: '',
         license_number: '',
         internal_remarks: '',
-        source: CustomerSource.Direct,
+        source: mode === 'affiliated' ? CustomerSource.Affiliated : CustomerSource.Direct,
         reference_name: '',
         reference_phone: '',
+        country: 'Pakistan',
         ...initialData
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => {
             const updated = { ...prev, [name]: value };
@@ -193,24 +202,26 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
 
     return (
         <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Customer Source</label>
-                <div className="flex flex-wrap gap-4">
-                    {Object.values(CustomerSource).map(source => (
-                        <label key={source} className="flex items-center gap-2 cursor-pointer group">
-                            <input
-                                type="radio"
-                                name="source"
-                                value={source}
-                                checked={formData.source === source}
-                                onChange={() => setFormData({ ...formData, source })}
-                                className="w-4 h-4 text-blue-600"
-                            />
-                            <span className={`text-sm ${formData.source === source ? 'font-bold text-blue-700' : 'text-slate-600'}`}>{source}</span>
-                        </label>
-                    ))}
+            {mode === 'standard' && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Customer Source</label>
+                    <div className="flex flex-wrap gap-4">
+                        {Object.values(CustomerSource).filter(s => s !== CustomerSource.Affiliated).map(source => (
+                            <label key={source} className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                    type="radio"
+                                    name="source"
+                                    value={source}
+                                    checked={formData.source === source}
+                                    onChange={() => setFormData({ ...formData, source })}
+                                    className="w-4 h-4 text-blue-600"
+                                />
+                                <span className={`text-sm ${formData.source === source ? 'font-bold text-blue-700' : 'text-slate-600'}`}>{source}</span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
@@ -240,24 +251,37 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any }> 
                 </div>
             )}
 
-            {formData.source !== CustomerSource.Affiliated && (
-                <>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Driving License (Optional)</label>
-                            <input name="license_number" value={formData.license_number} onChange={handleChange} className="w-full p-2.5 border rounded-xl" placeholder="Provincial/Federal ID" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">CNIC (Optional)</label>
-                            <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Address (Optional)</label>
-                        <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
-                    </div>
-                </>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Driving License (Optional)</label>
+                    <input name="license_number" value={formData.license_number} onChange={handleChange} className="w-full p-2.5 border rounded-xl" placeholder="Provincial/Federal ID" />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">CNIC (Optional)</label>
+                    <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Country</label>
+                <select
+                    name="country"
+                    value={formData.country}
+                    onChange={handleChange}
+                    className="w-full p-2.5 border rounded-xl bg-white"
+                >
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+            </div>
+            <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Address (Optional)</label>
+                <GoogleAutocompleteInput
+                    value={formData.address}
+                    onChange={(val) => setFormData({ ...formData, address: val })}
+                    placeholder="Search for address..."
+                    className="bg-white border-slate-200"
+                />
+            </div>
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Internal Remarks</label>
                 <textarea
