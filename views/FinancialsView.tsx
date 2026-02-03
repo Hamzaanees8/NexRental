@@ -240,25 +240,29 @@ const FinancialsView: React.FC = () => {
                 <div className={`font-mono font-bold ${isExpense ? 'text-slate-900' : 'text-green-600'}`}>
                   {isExpense ? '-' : '+'}{formatCurrency(t.amount)}
                 </div>
-                {/* <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditModal(t);
-                  }}
-                  className="text-slate-300 group-hover:text-blue-500 text-xs hidden sm:block cursor-pointer hover:underline"
-                >
-                  Edit
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteClick(t);
-                  }}
-                  className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition cursor-pointer"
-                  title="Delete"
-                >
-                  🗑️
-                </button> */}
+                {(t.type === TransactionType.PrivateHire || t.type === TransactionType.Expense) && (
+                  <>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(t);
+                      }}
+                      className="text-slate-300 group-hover:text-blue-500 text-xs hidden sm:block cursor-pointer hover:underline"
+                    >
+                      Edit
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(t);
+                      }}
+                      className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition cursor-pointer"
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )
@@ -295,7 +299,7 @@ const FinancialsView: React.FC = () => {
         onConfirm={onConfirmDelete}
         title="Delete Transaction"
         message={`Are you sure you want to delete "${deleteModal.transaction?.description}"? This cannot be undone.`}
-        confirmLabel="Delete Transaction"
+        confirmLabel="Delete"
       />
 
       {/* Private Hire Modal */}
@@ -323,13 +327,38 @@ const FinancialsView: React.FC = () => {
 // Refactored Simple Forms
 
 const ExpenseForm: React.FC<{ vehicles: Vehicle[], onSave: (data: any) => void, initialData: any }> = ({ vehicles, onSave, initialData }) => {
+  // Parse initial description to split Type and Notes
+  const parseDescription = (desc: string) => {
+    if (!desc) return { type: EXPENSE_TYPES[0], notes: '' };
+    const match = EXPENSE_TYPES.find(t => desc.startsWith(t));
+    if (match) {
+      return { type: match, notes: desc.substring(match.length).trim() };
+    }
+    return { type: 'Other', notes: desc };
+  };
+
+  const parsed = parseDescription(initialData.description);
+
   const [formData, setFormData] = useState({
     amount: 0,
-    description: EXPENSE_TYPES[0],
     vehicle_id: '',
     ...initialData,
+    description: parsed.type, // Use parsed type for the dropdown
+    notes: parsed.notes,      // Use parsed notes for text input
     date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
   });
+
+  const handleSave = () => {
+    // Reconstruct full description
+    const fullDescription = formData.description + (formData.notes ? ` ${formData.notes}` : '');
+    // Remove 'notes' from the object sent to backend
+    const { notes, ...dataToSave } = formData;
+
+    onSave({
+      ...dataToSave,
+      description: fullDescription
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -352,6 +381,18 @@ const ExpenseForm: React.FC<{ vehicles: Vehicle[], onSave: (data: any) => void, 
           />
         </div>
       </div>
+
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">Notes / Details</label>
+        <input
+          type="text"
+          className="w-full p-2.5 border rounded-lg"
+          placeholder="e.g. for Vehicle ABC-123"
+          value={formData.notes}
+          onChange={e => setFormData({ ...formData, notes: e.target.value })}
+        />
+      </div>
+
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">Vehicle (Optional)</label>
         <select
@@ -370,7 +411,7 @@ const ExpenseForm: React.FC<{ vehicles: Vehicle[], onSave: (data: any) => void, 
           onChange={e => setFormData({ ...formData, date: e.target.value })}
         />
       </div>
-      <button onClick={() => onSave(formData)} className="w-full bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg mt-4 cursor-pointer hover:bg-red-700 transition">
+      <button onClick={handleSave} className="w-full bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg mt-4 cursor-pointer hover:bg-red-700 transition">
         {initialData.id ? 'Update Expense' : 'Confirm Expense'}
       </button>
     </div>

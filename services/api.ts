@@ -308,20 +308,26 @@ export const deleteTransaction = async (id: string): Promise<void> => {
   
   if (fetchError) throw new Error(fetchError.message);
 
-  // 2. If linked to a maintenance record, delete it too
-  if (transaction.maintenance_id) {
-    await supabase
-      .from("maintenance_records")
-      .delete()
-      .eq("id", transaction.maintenance_id);
-  }
-
-  // 3. Delete the transaction
+  // 2. Delete the transaction FIRST (to resolve potential FK constraints)
   const { error } = await supabase
     .from("financial_transactions")
     .delete()
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  // 3. If linked to a maintenance record, delete it afterwards
+  if (transaction.maintenance_id) {
+    const { error: maintError } = await supabase
+      .from("maintenance_records")
+      .delete()
+      .eq("id", transaction.maintenance_id);
+      
+    if (maintError) {
+      console.error("Failed to delete associated maintenance record:", maintError);
+      // Optional: throw error or just log. Logging is safer to avoid blocking the user if transaction is already gone.
+      // throw new Error(maintError.message); 
+    }
+  }
 };
 
 export const createExpense = async (
