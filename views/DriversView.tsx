@@ -4,6 +4,7 @@ import { Driver } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const DriversView: React.FC = () => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -11,6 +12,7 @@ const DriversView: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
     const fetchDrivers = async () => {
         setLoading(true);
@@ -63,10 +65,14 @@ const DriversView: React.FC = () => {
         setEditingDriver(null);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this driver?")) return;
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, id });
+    };
+
+    const onConfirmDelete = async () => {
+        if (!deleteConfirmation.id) return;
         try {
-            await deleteDriver(id);
+            await deleteDriver(deleteConfirmation.id);
             toast.success("Driver record removed");
             fetchDrivers();
         } catch (error) {
@@ -138,7 +144,7 @@ const DriversView: React.FC = () => {
                                 ✎
                             </button>
                             <button
-                                onClick={() => handleDelete(driver.id)}
+                                onClick={() => handleDeleteClick(driver.id)}
                                 className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                 title="Delete"
                             >
@@ -191,6 +197,15 @@ const DriversView: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={deleteConfirmation.isOpen}
+                onClose={() => setDeleteConfirmation({ isOpen: false, id: null })}
+                onConfirm={onConfirmDelete}
+                title="Delete Driver"
+                message="Are you sure you want to delete this driver?"
+                confirmLabel="Delete Driver"
+            />
         </div>
     )
 }

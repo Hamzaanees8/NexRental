@@ -4,6 +4,7 @@ import { Vehicle, VehicleStatus, TransactionType } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { PlusIcon } from '../components/icons';
 import { STATUS_COLORS, VEHICLE_TYPES, formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
@@ -28,8 +29,17 @@ const FleetView: React.FC = () => {
   const [mtagHistory, setMtagHistory] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+
   const [editAmount, setEditAmount] = useState<number>(0);
   const [editDate, setEditDate] = useState<string>('');
+
+  // Delete Confirmation
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    type: 'vehicle' | 'mtag' | null;
+    id: string | null;
+    message?: string;
+  }>({ isOpen: false, type: null, id: null });
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -96,14 +106,33 @@ const FleetView: React.FC = () => {
     handleCloseModal();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this vehicle? All related maintenance and records will be affected.")) return;
+  const handleDelete = (id: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      type: 'vehicle',
+      id,
+      message: "Are you sure you want to delete this vehicle? All related maintenance and records will be affected."
+    });
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteConfirmation.id) return;
+
     try {
-      await deleteVehicle(id);
-      toast.success("Vehicle removed from fleet");
-      fetchVehicles();
+      if (deleteConfirmation.type === 'vehicle') {
+        await deleteVehicle(deleteConfirmation.id);
+        toast.success("Vehicle removed from fleet");
+        fetchVehicles();
+      } else if (deleteConfirmation.type === 'mtag') {
+        await deleteMTagTransaction(deleteConfirmation.id);
+        toast.success("Transaction removed");
+        await fetchVehicles();
+        if (topUpVehicle) {
+          setMtagHistory(prev => prev.filter(h => h.id !== deleteConfirmation.id));
+        }
+      }
     } catch (error) {
-      toast.error("Failed to delete vehicle. Make sure it has no active bookings.");
+      toast.error("Delete failed");
     }
   };
 
@@ -139,20 +168,13 @@ const FleetView: React.FC = () => {
     }
   }
 
-  const handleDeleteMTagTx = async (txId: string) => {
-    if (!window.confirm("Remove this transaction? This will also revert the vehicle's balance.")) return;
-    try {
-      await deleteMTagTransaction(txId);
-      toast.success("Transaction removed");
-      await fetchVehicles(); // Refresh both vehicles (balance) and transactions (history)
-
-      // Update local history display if we're still in the modal
-      if (topUpVehicle) {
-        setMtagHistory(prev => prev.filter(h => h.id !== txId));
-      }
-    } catch (e) {
-      toast.error("Delete failed");
-    }
+  const handleDeleteMTagTx = (txId: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      type: 'mtag',
+      id: txId,
+      message: "Remove this transaction? This will also revert the vehicle's balance."
+    });
   }
 
   const handleEditMTagTx = async (txId: string) => {
@@ -442,6 +464,14 @@ const FleetView: React.FC = () => {
           </div>
         )
       }
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, type: null, id: null })}
+        onConfirm={onConfirmDelete}
+        title={deleteConfirmation.type === 'vehicle' ? "Delete Vehicle" : "Remove Transaction"}
+        message={deleteConfirmation.message || "Are you sure?"}
+        confirmLabel="Confirm Delete"
+      />
     </div >
   );
 };

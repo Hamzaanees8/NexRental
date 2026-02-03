@@ -7,6 +7,7 @@ import { PlusIcon } from '../components/icons';
 import SearchableSelect from '../components/SearchableSelect';
 import MultiSearchableSelect from '../components/MultiSearchableSelect';
 import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const formatDateForInput = (dateValue: string | Date | undefined) => {
     if (!dateValue) return '';
@@ -26,6 +27,7 @@ const RentalsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, rentalId: string | null }>({ isOpen: false, rentalId: null });
 
     // Form State
     const [formData, setFormData] = useState<Partial<Rental>>({
@@ -146,10 +148,14 @@ const RentalsView: React.FC = () => {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this rental?")) return;
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, rentalId: id });
+    }
+
+    const onConfirmDelete = async () => {
+        if (!deleteConfirmation.rentalId) return;
         try {
-            await deleteRental(id);
+            await deleteRental(deleteConfirmation.rentalId);
             toast.success("Rental deleted successfully");
             loadData();
         } catch (e) {
@@ -296,7 +302,7 @@ const RentalsView: React.FC = () => {
                                         title="Edit"
                                     >✎</button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(rental.id); }}
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(rental.id); }}
                                         className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                         title="Delete"
                                     >🗑</button>
@@ -674,6 +680,15 @@ const RentalsView: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={deleteConfirmation.isOpen}
+                onClose={() => setDeleteConfirmation({ isOpen: false, rentalId: null })}
+                onConfirm={onConfirmDelete}
+                title="Delete Rental"
+                message="Are you sure you want to delete this rental? This action cannot be undone."
+                confirmLabel="Delete Rental"
+            />
         </div>
     );
 };

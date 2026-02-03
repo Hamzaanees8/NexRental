@@ -4,6 +4,7 @@ import { MaintenanceRecord, Vehicle, MaintenanceType } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { PlusIcon } from '../components/icons';
 import { EXPENSE_TYPES, formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
@@ -19,6 +20,7 @@ const MaintenanceView: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
   const fetchMaintenanceData = async () => {
     setLoading(true);
@@ -74,10 +76,14 @@ const MaintenanceView: React.FC = () => {
     }
   };
 
-  const handleDeleteRecord = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
+  const handleDeleteClick = (id: string) => {
+    setDeleteConfirmation({ isOpen: true, id });
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteConfirmation.id) return;
     try {
-      await deleteMaintenanceRecord(id);
+      await deleteMaintenanceRecord(deleteConfirmation.id);
       toast.success("Record deleted");
       fetchMaintenanceData();
     } catch (error) {
@@ -139,7 +145,7 @@ const MaintenanceView: React.FC = () => {
                   ✎
                 </button>
                 <button
-                  onClick={() => handleDeleteRecord(r.id)}
+                  onClick={() => handleDeleteClick(r.id)}
                   className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                   title="Delete"
                 >
@@ -187,6 +193,15 @@ const MaintenanceView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, id: null })}
+        onConfirm={onConfirmDelete}
+        title="Delete Maintenance Record"
+        message="Are you sure you want to delete this maintenance record?"
+        confirmLabel="Delete Record"
+      />
     </div>
   );
 };

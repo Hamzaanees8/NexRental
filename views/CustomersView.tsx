@@ -3,6 +3,7 @@ import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '..
 import { Customer, CustomerSource } from '../types';
 import { PlusIcon } from '../components/icons';
 import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { COUNTRIES } from '../countries';
 import toast from 'react-hot-toast';
 
@@ -12,6 +13,7 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
     const fetchCustomers = async () => {
         setLoading(true);
@@ -59,10 +61,14 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
         setEditingCustomer(null);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this customer?")) return;
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, id });
+    };
+
+    const onConfirmDelete = async () => {
+        if (!deleteConfirmation.id) return;
         try {
-            await deleteCustomer(id);
+            await deleteCustomer(deleteConfirmation.id);
             toast.success("Customer deleted successfully");
             fetchCustomers();
         } catch (error) {
@@ -133,7 +139,7 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
                                 ✎
                             </button>
                             <button
-                                onClick={() => handleDelete(customer.id)}
+                                onClick={() => handleDeleteClick(customer.id)}
                                 className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                                 title="Delete"
                             >
@@ -191,6 +197,15 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
                     </div>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={deleteConfirmation.isOpen}
+                onClose={() => setDeleteConfirmation({ isOpen: false, id: null })}
+                onConfirm={onConfirmDelete}
+                title="Delete Customer"
+                message="Are you sure you want to delete this customer?"
+                confirmLabel="Delete Customer"
+            />
         </div>
     );
 };

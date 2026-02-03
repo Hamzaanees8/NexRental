@@ -3,6 +3,7 @@ import { getTransactions, createExpense, getVehicles, createPrivateHire, updateT
 import { Transaction, TransactionType, Vehicle, ContractType } from '../types';
 import { TRANSACTION_TYPE_COLORS, EXPENSE_TYPES, formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const FinancialsView: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -15,7 +16,14 @@ const FinancialsView: React.FC = () => {
   // Modals
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isPrivateHireModalOpen, setIsPrivateHireModalOpen] = useState(false);
+
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // Delete Confirmation
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, transaction: Transaction | null }>({
+    isOpen: false,
+    transaction: null
+  });
 
 
   // ... fetch logic similar to before
@@ -101,10 +109,14 @@ const FinancialsView: React.FC = () => {
     }
   }
 
-  const handleDelete = async (t: Transaction) => {
-    if (!window.confirm(`Are you sure you want to delete this transaction: ${t.description}?`)) return;
+  const handleDeleteClick = (t: Transaction) => {
+    setDeleteModal({ isOpen: true, transaction: t });
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteModal.transaction) return;
     try {
-      await deleteTransaction(t.id);
+      await deleteTransaction(deleteModal.transaction.id);
       toast.success("Transaction deleted");
       fetchFinancialData();
     } catch (error) {
@@ -240,7 +252,7 @@ const FinancialsView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDelete(t);
+                    handleDeleteClick(t);
                   }}
                   className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition cursor-pointer"
                   title="Delete"
@@ -276,6 +288,15 @@ const FinancialsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, transaction: null })}
+        onConfirm={onConfirmDelete}
+        title="Delete Transaction"
+        message={`Are you sure you want to delete "${deleteModal.transaction?.description}"? This cannot be undone.`}
+        confirmLabel="Delete Transaction"
+      />
 
       {/* Private Hire Modal */}
       {isPrivateHireModalOpen && (
