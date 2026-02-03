@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getDrivers, createDriver, updateDriver, deleteDriver } from '../services/api';
+import { getDrivers, createDriver, updateDriver, deleteDriver, uploadFile } from '../services/api';
 import { Driver } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 
 const DriversView: React.FC = () => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -53,11 +54,18 @@ const DriversView: React.FC = () => {
             return;
         }
 
+        // Sanitize data: convert empty strings to null for date fields
+        const sanitizedData = {
+            ...formData,
+            cnic_expiry: formData.cnic_expiry || null,
+            license_expiry: formData.license_expiry || null,
+        };
+
         if (editingDriver) {
-            await updateDriver(editingDriver.id, formData);
+            await updateDriver(editingDriver.id, sanitizedData);
             toast.success("Driver details updated");
         } else {
-            await createDriver(formData);
+            await createDriver(sanitizedData);
             toast.success("Driver registered successfully");
         }
         fetchDrivers();
@@ -223,10 +231,68 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
         internal_remarks: '',
         ...initialData
     });
+    const [files, setFiles] = useState<{
+        cnic_front?: File,
+        cnic_back?: File,
+        license_front?: File,
+        license_back?: File
+    }>({});
+    const [uploading, setUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewTitle, setPreviewTitle] = useState<string>('');
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: name === 'base_salary' ? Math.max(0, parseFloat(value) || 0) : value });
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof typeof files) => {
+        if (e.target.files && e.target.files[0]) {
+            setFiles(prev => ({ ...prev, [field]: e.target.files![0] }));
+        }
+    };
+
+    const handleViewImage = (url: string | undefined, title: string) => {
+        if (url) {
+            setPreviewImage(url);
+            setPreviewTitle(title);
+        }
+    };
+
+    const handleRemoveImage = (field: 'img_cnic_front' | 'img_cnic_back' | 'img_license_front' | 'img_license_back') => {
+        setFormData({ ...formData, [field]: null });
+    };
+
+    const handleRemoveFile = (field: keyof typeof files) => {
+        setFiles(prev => {
+            const updated = { ...prev };
+            delete updated[field];
+            return updated;
+        });
+    };
+
+    const handleFormSave = async () => {
+        setUploading(true);
+        try {
+            let updatedData = { ...formData };
+
+            const upload = async (file: File, prefix: string) => {
+                const path = `drivers/${Date.now()}_${prefix}_${file.name}`;
+                return await uploadFile('documents', path, file);
+            }
+
+            if (files.cnic_front) updatedData.img_cnic_front = await upload(files.cnic_front, 'cnic_front');
+            if (files.cnic_back) updatedData.img_cnic_back = await upload(files.cnic_back, 'cnic_back');
+            if (files.license_front) updatedData.img_license_front = await upload(files.license_front, 'license_front');
+            if (files.license_back) updatedData.img_license_back = await upload(files.license_back, 'license_back');
+
+            onSave({ ...updatedData, base_salary: Number(updatedData.base_salary) });
+        } catch (e) {
+            toast.error("Error uploading documents");
+            console.error(e);
+        } finally {
+            setUploading(false);
+        }
     };
 
     return (
@@ -255,6 +321,186 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                     <input type="date" name="cnic_expiry" value={formData.cnic_expiry} onChange={handleChange} className="w-full p-2.5 border rounded-xl" />
                 </div>
             </div>
+
+            {/* Documents Section */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                <h4 className="font-bold text-slate-700 text-sm uppercase">Documents</h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">CNIC Front</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_front')} className="w-full text-xs" />
+                        {formData.img_cnic_front && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(formData.img_cnic_front, 'CNIC Front')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage('img_cnic_front')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                        {files.cnic_front && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-blue-600"> {files.cnic_front.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(URL.createObjectURL(files.cnic_front!), 'CNIC Front Preview')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile('cnic_front')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">CNIC Back</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_back')} className="w-full text-xs" />
+                        {formData.img_cnic_back && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(formData.img_cnic_back, 'CNIC Back')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage('img_cnic_back')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                        {files.cnic_back && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-blue-600"> {files.cnic_back.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(URL.createObjectURL(files.cnic_back!), 'CNIC Back Preview')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile('cnic_back')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">License Front</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_front')} className="w-full text-xs" />
+                        {formData.img_license_front && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(formData.img_license_front, 'License Front')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage('img_license_front')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                        {files.license_front && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-blue-600"> {files.license_front.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(URL.createObjectURL(files.license_front!), 'License Front Preview')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile('license_front')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">License Back</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_back')} className="w-full text-xs" />
+                        {formData.img_license_back && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(formData.img_license_back, 'License Back')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage('img_license_back')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                        {files.license_back && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-blue-600"> {files.license_back.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleViewImage(URL.createObjectURL(files.license_back!), 'License Back Preview')}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                    View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile('license_back')}
+                                    className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">License No</label>
@@ -288,12 +534,29 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
             </div>
 
             <button
-                onClick={() => onSave({ ...formData, base_salary: Number(formData.base_salary) })}
-                disabled={!formData.name || !formData.license_no}
-                className="w-full bg-blue-600 cursor-pointer text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 mt-4"
+                onClick={handleFormSave}
+                disabled={!formData.name || !formData.license_no || uploading}
+                className="w-full bg-blue-600 cursor-pointer text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 mt-4 flex justify-center items-center"
             >
-                {initialData.id ? 'Update Driver' : 'Register Driver'}
+                {uploading ? (
+                    <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Uploading...
+                    </>
+                ) : (
+                    initialData.id ? 'Update Driver' : 'Register Driver'
+                )}
             </button>
+
+            <ImagePreviewModal
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                imageUrl={previewImage}
+                title={previewTitle}
+            />
         </div>
     )
 }

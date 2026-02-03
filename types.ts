@@ -44,6 +44,10 @@ export interface Customer {
   reference_name?: string;
   reference_phone?: string;
   country?: string;
+  img_cnic_front?: string;
+  img_cnic_back?: string;
+  img_license_front?: string;
+  img_license_back?: string;
 }
 
 export interface Driver {
@@ -58,6 +62,10 @@ export interface Driver {
   status: 'Available' | 'On Trip' | 'Inactive';
   base_salary?: number;
   internal_remarks?: string;
+  img_cnic_front?: string;
+  img_cnic_back?: string;
+  img_license_front?: string;
+  img_license_back?: string;
 }
 
 export enum TripStatus {
@@ -135,10 +143,19 @@ export interface Rental {
   self_drive_license?: string;
   self_drive_cnic?: string;
   self_drive_phone?: string;
+
+  // Document Images for Self Drive
+  self_drive_img_license_front?: string;
+  self_drive_img_license_back?: string;
+  self_drive_img_cnic_front?: string;
+  self_drive_img_cnic_back?: string;
+
   guarantor_name?: string;
   guarantor_info?: string;
   guarantor_cnic?: string;
   guarantor_phone?: string;
+  guarantor_img_cnic_front?: string;
+  guarantor_img_cnic_back?: string;
   amount_type?: ContractType;
 
   // Expenses incurred during this specific rental

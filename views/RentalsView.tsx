@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, Driver, Rental, RentalStatus, Vehicle, RentalType, ContractType, CustomerSource } from '../types';
-import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental, getSettings, updateSettings } from '../services/api';
+import { getRentals, getCustomers, getDrivers, getVehicles, createRental, createCustomer, updateRental, deleteRental, getSettings, updateSettings, uploadFile } from '../services/api';
 import { formatCurrency, RIDE_EXPENSE_TYPES } from '../constants';
 import toast from 'react-hot-toast';
 import { PlusIcon } from '../components/icons';
@@ -8,6 +8,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import MultiSearchableSelect from '../components/MultiSearchableSelect';
 import GoogleAutocompleteInput from '../components/GoogleAutocompleteInput';
 import ConfirmationModal from '../components/ConfirmationModal';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 
 const formatDateForInput = (dateValue: string | Date | undefined) => {
     if (!dateValue) return '';
@@ -28,6 +29,19 @@ const RentalsView: React.FC = () => {
 
     const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, rentalId: string | null }>({ isOpen: false, rentalId: null });
+
+    // File Upload State
+    const [files, setFiles] = useState<{
+        self_drive_license_front?: File,
+        self_drive_license_back?: File,
+        self_drive_cnic_front?: File,
+        self_drive_cnic_back?: File,
+        guarantor_cnic_front?: File,
+        guarantor_cnic_back?: File
+    }>({});
+    const [uploading, setUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewTitle, setPreviewTitle] = useState<string>('');
 
     // Form State
     const [formData, setFormData] = useState<Partial<Rental>>({
@@ -70,6 +84,31 @@ const RentalsView: React.FC = () => {
         reference_phone: ''
     });
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof typeof files) => {
+        if (e.target.files && e.target.files[0]) {
+            setFiles(prev => ({ ...prev, [field]: e.target.files![0] }));
+        }
+    };
+
+    const handleViewImage = (url: string | undefined, title: string) => {
+        if (url) {
+            setPreviewImage(url);
+            setPreviewTitle(title);
+        }
+    };
+
+    const handleRemoveImage = (field: keyof Rental) => {
+        setFormData({ ...formData, [field]: null });
+    };
+
+    const handleRemoveFile = (field: keyof typeof files) => {
+        setFiles(prev => {
+            const updated = { ...prev };
+            delete updated[field];
+            return updated;
+        });
+    };
+
     useEffect(() => {
         loadData();
     }, []);
@@ -91,38 +130,55 @@ const RentalsView: React.FC = () => {
     };
 
     const handleCreateOrUpdate = async () => {
+        setUploading(true);
         try {
             if (!formData.vehicle_id || (!formData.customer_id && !formData.affiliated_id) || !formData.start_time || !formData.end_time) {
                 toast.error("Please fill all required fields (Vehicle, Customer/Partner, and Timing)");
+                setUploading(false);
                 return;
             }
             if (new Date(formData.end_time || '') <= new Date(formData.start_time || '')) {
                 toast.error("End time must be after start time");
+                setUploading(false);
                 return;
             }
 
             if (formData.odometer_end && (formData.odometer_end < (formData.odometer_start || 0))) {
                 toast.error("Odometer end reading cannot be less than start reading");
+                setUploading(false);
                 return;
             }
 
             if ((formData.rent_amount || 0) < 0) {
                 toast.error("Rent amount cannot be negative");
+                setUploading(false);
                 return;
             }
 
             if ((formData.commission_amount || 0) < 0) {
                 toast.error("Commission amount cannot be negative");
+                setUploading(false);
                 return;
             }
 
             if (formData.rental_type === RentalType.WithDriver && !formData.driver_id) {
                 toast.error("Please select a driver for 'With Driver' booking");
+                setUploading(false);
                 return;
             }
 
+            // Upload Files
+            const uploadedUrls: any = {};
+            if (files.self_drive_license_front) uploadedUrls.self_drive_img_license_front = await uploadFile('documents', `rentals/${Date.now()}_sd_lic_f_${files.self_drive_license_front.name}`, files.self_drive_license_front);
+            if (files.self_drive_license_back) uploadedUrls.self_drive_img_license_back = await uploadFile('documents', `rentals/${Date.now()}_sd_lic_b_${files.self_drive_license_back.name}`, files.self_drive_license_back);
+            if (files.self_drive_cnic_front) uploadedUrls.self_drive_img_cnic_front = await uploadFile('documents', `rentals/${Date.now()}_sd_cnic_f_${files.self_drive_cnic_front.name}`, files.self_drive_cnic_front);
+            if (files.self_drive_cnic_back) uploadedUrls.self_drive_img_cnic_back = await uploadFile('documents', `rentals/${Date.now()}_sd_cnic_b_${files.self_drive_cnic_back.name}`, files.self_drive_cnic_back);
+            if (files.guarantor_cnic_front) uploadedUrls.guarantor_img_cnic_front = await uploadFile('documents', `rentals/${Date.now()}_g_cnic_f_${files.guarantor_cnic_front.name}`, files.guarantor_cnic_front);
+            if (files.guarantor_cnic_back) uploadedUrls.guarantor_img_cnic_back = await uploadFile('documents', `rentals/${Date.now()}_g_cnic_b_${files.guarantor_cnic_back.name}`, files.guarantor_cnic_back);
+
             const dataToSave = {
                 ...formData,
+                ...uploadedUrls,
                 start_time: new Date(formData.start_time || '').toISOString(),
                 end_time: new Date(formData.end_time || '').toISOString(),
             };
@@ -141,10 +197,13 @@ const RentalsView: React.FC = () => {
 
             setViewMode('list');
             setSelectedRental(null);
+            setFiles({}); // Reset files
             loadData();
         } catch (e: any) {
             console.error("Save Error Full:", e);
             toast.error("Error saving: " + (e.message || "Unknown"));
+        } finally {
+            setUploading(false);
         }
     }
 
@@ -438,6 +497,7 @@ const RentalsView: React.FC = () => {
                             </div>
                         ) : (
                             <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
+                                <h4 className="font-bold text-orange-800 text-sm uppercase">Driver Details</h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input placeholder="Driver Name" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_name || ''} onChange={e => setFormData({ ...formData, self_drive_name: e.target.value })} />
                                     <input type="number" placeholder="Driver Phone" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_phone || ''} onChange={e => setFormData({ ...formData, self_drive_phone: e.target.value })} />
@@ -446,12 +506,77 @@ const RentalsView: React.FC = () => {
                                     <input placeholder="License No" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_license || ''} onChange={e => setFormData({ ...formData, self_drive_license: e.target.value })} />
                                     <input placeholder="CNIC No" className="w-full p-2 border rounded-xl bg-white" value={formData.self_drive_cnic || ''} onChange={e => setFormData({ ...formData, self_drive_cnic: e.target.value })} />
                                 </div>
-                                <div className="pt-2 border-t border-orange-200">
-                                    <p className="text-[10px] font-bold text-orange-600 uppercase mb-2 tracking-wider">Guarantor Details</p>
-                                    <div className="grid grid-cols-3 gap-2">
+
+                                {/* Driver Documents */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                        { label: 'License Front', field: 'self_drive_license_front', dbField: 'self_drive_img_license_front' },
+                                        { label: 'License Back', field: 'self_drive_license_back', dbField: 'self_drive_img_license_back' },
+                                        { label: 'CNIC Front', field: 'self_drive_cnic_front', dbField: 'self_drive_img_cnic_front' },
+                                        { label: 'CNIC Back', field: 'self_drive_cnic_back', dbField: 'self_drive_img_cnic_back' },
+                                    ].map((item) => (
+                                        <div key={item.field}>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">{item.label}</label>
+                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+
+                                            {/* Existing Uploaded Image */}
+                                            {formData[item.dbField as keyof Rental] && (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                                    <button type="button" onClick={() => handleViewImage(formData[item.dbField as keyof Rental] as string, item.label)} className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer">View</button>
+                                                    <button type="button" onClick={() => handleRemoveImage(item.dbField as keyof Rental)} className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer">Remove</button>
+                                                </div>
+                                            )}
+
+                                            {/* Newly Selected File */}
+                                            {files[item.field as keyof typeof files] && (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] text-blue-600"> {files[item.field as keyof typeof files]?.name}</span>
+                                                    <button type="button" onClick={() => handleViewImage(URL.createObjectURL(files[item.field as keyof typeof files]!), `${item.label} Preview`)} className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer">View</button>
+                                                    <button type="button" onClick={() => handleRemoveFile(item.field as keyof typeof files)} className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer">Remove</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="pt-4 border-t border-orange-200">
+                                    <h4 className="font-bold text-orange-800 text-sm uppercase mb-2">Guarantor Details</h4>
+                                    <div className="grid grid-cols-3 gap-2 mb-4">
                                         <input placeholder="Guarantor Name" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_name || ''} onChange={e => setFormData({ ...formData, guarantor_name: e.target.value })} />
                                         <input placeholder="Guarantor CNIC" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_cnic || ''} onChange={e => setFormData({ ...formData, guarantor_cnic: e.target.value })} />
                                         <input type="number" placeholder="Guarantor Phone" className="w-full p-2 border rounded-xl bg-white text-sm" value={formData.guarantor_phone || ''} onChange={e => setFormData({ ...formData, guarantor_phone: e.target.value })} />
+                                    </div>
+
+                                    {/* Guarantor Documents */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {[
+                                            { label: 'Guarantor CNIC Front', field: 'guarantor_cnic_front', dbField: 'guarantor_img_cnic_front' },
+                                            { label: 'Guarantor CNIC Back', field: 'guarantor_cnic_back', dbField: 'guarantor_img_cnic_back' },
+                                        ].map((item) => (
+                                            <div key={item.field}>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">{item.label}</label>
+                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+
+                                                {/* Existing Uploaded Image */}
+                                                {formData[item.dbField as keyof Rental] && (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] text-green-600">✓ Uploaded</span>
+                                                        <button type="button" onClick={() => handleViewImage(formData[item.dbField as keyof Rental] as string, item.label)} className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer">View</button>
+                                                        <button type="button" onClick={() => handleRemoveImage(item.dbField as keyof Rental)} className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer">Remove</button>
+                                                    </div>
+                                                )}
+
+                                                {/* Newly Selected File */}
+                                                {files[item.field as keyof typeof files] && (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] text-blue-600"> {files[item.field as keyof typeof files]?.name}</span>
+                                                        <button type="button" onClick={() => handleViewImage(URL.createObjectURL(files[item.field as keyof typeof files]!), `${item.label} Preview`)} className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer">View</button>
+                                                        <button type="button" onClick={() => handleRemoveFile(item.field as keyof typeof files)} className="text-[10px] text-red-600 hover:text-red-800 underline cursor-pointer">Remove</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -644,8 +769,8 @@ const RentalsView: React.FC = () => {
                         </select>
 
                         <div className="pt-4 flex gap-4">
-                            <button onClick={handleCreateOrUpdate} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition">
-                                {selectedRental ? 'Update Booking' : 'Confirm Booking'}
+                            <button onClick={handleCreateOrUpdate} disabled={uploading} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition flex justify-center items-center">
+                                {uploading ? 'Uploading & Saving...' : (selectedRental ? 'Update Booking' : 'Confirm Booking')}
                             </button>
                         </div>
                     </div>
@@ -688,6 +813,13 @@ const RentalsView: React.FC = () => {
                 title="Delete Rental"
                 message="Are you sure you want to delete this rental? This action cannot be undone."
                 confirmLabel="Delete Rental"
+            />
+
+            <ImagePreviewModal
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                imageUrl={previewImage}
+                title={previewTitle}
             />
         </div>
     );

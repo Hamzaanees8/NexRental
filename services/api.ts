@@ -14,7 +14,7 @@ import {
   AppSettings,
 } from "../types";
 import { TENANT_ID } from "../constants";
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseAdmin } from "./supabaseClient";
 
 // --- API FUNCTIONS ---
 
@@ -1030,4 +1030,15 @@ export const updateSettings = async (settings: Partial<AppSettings>): Promise<Ap
     if (error) throw new Error(error.message);
     return data[0] as AppSettings;
   }
+};
+
+// Storage
+export const uploadFile = async (bucket: string, path: string, file: File): Promise<string> => {
+  const { data, error } = await supabaseAdmin.storage.from(bucket).upload(path, file, {
+    upsert: true
+  });
+  if (error) throw new Error(error.message);
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+  return publicUrl;
 };
