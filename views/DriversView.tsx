@@ -329,7 +329,9 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">CNIC Front</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_front')} className="w-full text-xs" />
+                        {!formData.img_cnic_front && !files.cnic_front && (
+                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_front')} className="w-full text-xs" />
+                        )}
                         {formData.img_cnic_front && (
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-green-600">✓ Uploaded</span>
@@ -371,7 +373,9 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">CNIC Back</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_back')} className="w-full text-xs" />
+                        {!formData.img_cnic_back && !files.cnic_back && (
+                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cnic_back')} className="w-full text-xs" />
+                        )}
                         {formData.img_cnic_back && (
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-green-600">✓ Uploaded</span>
@@ -416,7 +420,9 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">License Front</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_front')} className="w-full text-xs" />
+                        {!formData.img_license_front && !files.license_front && (
+                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_front')} className="w-full text-xs" />
+                        )}
                         {formData.img_license_front && (
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-green-600">✓ Uploaded</span>
@@ -458,7 +464,9 @@ const DriverForm: React.FC<{ onSave: (data: any) => void, initialData: any }> = 
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">License Back</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_back')} className="w-full text-xs" />
+                        {!formData.img_license_back && !files.license_back && (
+                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'license_back')} className="w-full text-xs" />
+                        )}
                         {formData.img_license_back && (
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-green-600">✓ Uploaded</span>

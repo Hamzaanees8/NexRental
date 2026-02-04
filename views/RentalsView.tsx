@@ -167,6 +167,12 @@ const RentalsView: React.FC = () => {
                 return;
             }
 
+            if (!formData.status) {
+                toast.error("Please select a booking status");
+                setUploading(false);
+                return;
+            }
+
             // Upload Files
             const uploadedUrls: any = {};
             if (files.self_drive_license_front) uploadedUrls.self_drive_img_license_front = await uploadFile('documents', `rentals/${Date.now()}_sd_lic_f_${files.self_drive_license_front.name}`, files.self_drive_license_front);
@@ -181,6 +187,9 @@ const RentalsView: React.FC = () => {
                 ...uploadedUrls,
                 start_time: new Date(formData.start_time || '').toISOString(),
                 end_time: new Date(formData.end_time || '').toISOString(),
+                // Sanitize UUIDs: Convert empty strings to null
+                driver_id: formData.driver_id || null,
+                affiliated_id: formData.affiliated_id || null,
             };
 
             console.log("Saving Rental Data:", dataToSave);
@@ -258,6 +267,7 @@ const RentalsView: React.FC = () => {
         setSelectedRental(null);
         setFormData({
             rental_type: RentalType.WithDriver,
+            status: '' as any, // Start with no status
             start_time: formatDateForInput(new Date()),
             end_time: formatDateForInput(new Date(Date.now() + 86400000)),
             rent_amount: 0,
@@ -517,7 +527,9 @@ const RentalsView: React.FC = () => {
                                     ].map((item) => (
                                         <div key={item.field}>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">{item.label}</label>
-                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+                                            {!formData[item.dbField as keyof Rental] && !files[item.field as keyof typeof files] && (
+                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+                                            )}
 
                                             {/* Existing Uploaded Image */}
                                             {formData[item.dbField as keyof Rental] && (
@@ -556,7 +568,9 @@ const RentalsView: React.FC = () => {
                                         ].map((item) => (
                                             <div key={item.field}>
                                                 <label className="block text-xs font-bold text-slate-500 mb-1">{item.label}</label>
-                                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+                                                {!formData[item.dbField as keyof Rental] && !files[item.field as keyof typeof files] && (
+                                                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, item.field as keyof typeof files)} className="w-full text-xs" />
+                                                )}
 
                                                 {/* Existing Uploaded Image */}
                                                 {formData[item.dbField as keyof Rental] && (
@@ -764,9 +778,13 @@ const RentalsView: React.FC = () => {
                             />
                         </div>
 
-                        <select className="w-full p-2 border rounded-xl bg-slate-50" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}>
-                            {Object.values(RentalStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Booking Status</label>
+                            <select className="w-full p-2 border rounded-xl bg-slate-50" value={formData.status || ''} onChange={e => setFormData({ ...formData, status: e.target.value as RentalStatus })}>
+                                <option value="">-- Select Status --</option>
+                                {Object.values(RentalStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
 
                         <div className="pt-4 flex gap-4">
                             <button onClick={handleCreateOrUpdate} disabled={uploading} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition flex justify-center items-center">

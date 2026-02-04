@@ -594,15 +594,15 @@ export const getRentals = async (): Promise<Rental[]> => {
 };
 
 export const createRental = async (
-  rental: Omit<Rental, "id" | "tenant_id" | "status">
+  rental: Omit<Rental, "id" | "tenant_id">
 ): Promise<Rental> => {
   const { data, error } = await supabase
     .from("rentals")
     .insert([
       {
+        status: RentalStatus.Reserved,
         ...rental,
         tenant_id: TENANT_ID,
-        status: RentalStatus.Reserved,
       },
     ])
     .select();
