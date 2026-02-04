@@ -159,10 +159,10 @@ export const generateVoucher = async (
 export const getFinanceSummary = async (): Promise<FinancialSummary> => {
   const [
     { data: transactions, error: txError },
-    { data: settledRentals, error: rentalError }
+    { data: allRentals, error: rentalError }
   ] = await Promise.all([
     supabase.from("financial_transactions").select("*").eq("tenant_id", TENANT_ID),
-    supabase.from("rentals").select("*").eq("tenant_id", TENANT_ID).eq("status", "Settled")
+    supabase.from("rentals").select("*").eq("tenant_id", TENANT_ID)
   ]);
 
   if (txError) throw new Error(txError.message);
@@ -175,17 +175,25 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
     dailyData: [],
   };
   const dailyMap: { [key: string]: { revenue: number; costs: number } } = {};
+  const rentalMap = new Map((allRentals || []).map(r => [r.id, r]));
 
   // Track which rentals already have an income transaction
   const txRentalIds = new Set(transactions?.filter(t => t.type === TransactionType.RentalIncome).map(t => t.rental_id));
 
   transactions?.forEach((t) => {
-    // Skip M-Tag transactions - they're internal transfers, not revenue or expenses
+    // Skip M-Tag transactions
     if (t.type === TransactionType.MTagTopUp || t.type === TransactionType.MTagUsage) {
       return;
     }
 
-    const dateStr = new Date(t.date).toISOString().split("T")[0];
+    // Use Rental Start Date for ANY transaction linked to a rental (Revenue OR Expense)
+    let dateToUse = t.date;
+    if (t.rental_id && rentalMap.has(t.rental_id)) {
+        dateToUse = rentalMap.get(t.rental_id)!.start_time;
+    }
+
+    const d = new Date(dateToUse);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (!dailyMap[dateStr]) {
       dailyMap[dateStr] = { revenue: 0, costs: 0 };
     }
@@ -208,9 +216,10 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
   });
 
   // Add revenue and expenses from Settled rentals that don't have a transaction yet
-  settledRentals?.forEach((r) => {
-    if (!txRentalIds.has(r.id)) {
-      const dateStr = new Date(r.start_time).toISOString().split("T")[0];
+  allRentals?.forEach((r) => {
+    if (r.status === 'Settled' && !txRentalIds.has(r.id)) {
+      const d = new Date(r.start_time);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (!dailyMap[dateStr]) {
         dailyMap[dateStr] = { revenue: 0, costs: 0 };
       }
@@ -225,7 +234,7 @@ export const getFinanceSummary = async (): Promise<FinancialSummary> => {
                           (r.driver_allowance || 0) + 
                           (r.other_expenses || 0) +
                           (r.commission_amount || 0) +
-                          (r.ride_expenses || []).reduce((sum, e) => sum + e.amount, 0);
+                          (r.ride_expenses || []).reduce((sum: number, e: any) => sum + e.amount, 0);
       
       summary.totalCosts += totalExpenses;
       dailyMap[dateStr].costs += totalExpenses;
