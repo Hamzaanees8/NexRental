@@ -48,6 +48,7 @@ export interface Customer {
   img_cnic_back?: string;
   img_license_front?: string;
   img_license_back?: string;
+  car_models?: string;
 }
 
 export interface Driver {

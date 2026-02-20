@@ -21,6 +21,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS source TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS reference_name TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS reference_phone TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS car_models TEXT;
 
 -- 2. Create Drivers Table
 CREATE TABLE IF NOT EXISTS drivers (

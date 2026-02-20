@@ -60,6 +60,7 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
             whatsapp: formData.whatsapp || null,
             reference_name: formData.reference_name || null,
             reference_phone: formData.reference_phone || null,
+            car_models: formData.car_models || null,
         };
 
         if (editingCustomer) {
@@ -100,8 +101,10 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
     }
 
     const filteredCustomers = customers.filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.phone.includes(searchTerm);
+        const search = searchTerm.toLowerCase();
+        const matchesSearch = c.name.toLowerCase().includes(search) ||
+            c.phone.includes(searchTerm) ||
+            c.car_models?.toLowerCase().includes(search);
 
         if (mode === 'affiliated') {
             return matchesSearch && c.source === CustomerSource.Affiliated;
@@ -185,6 +188,15 @@ const CustomersView: React.FC<{ mode?: 'standard' | 'affiliated' }> = ({ mode = 
                                 {customer.license_number && <p>License: {customer.license_number}</p>}
                                 {customer.address && <p>Addr: {customer.address}</p>}
                                 {customer.internal_remarks && <p className="text-blue-600 italic">Notes: {customer.internal_remarks}</p>}
+                                {customer.car_models && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {customer.car_models.split(',').map((model, idx) => (
+                                            <span key={idx} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-blue-100">
+                                                {model.trim()}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -236,6 +248,7 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any, mo
         reference_name: '',
         reference_phone: '',
         country: 'Pakistan',
+        car_models: '',
         ...initialData
     });
 
@@ -369,7 +382,19 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any, mo
                     <input name="cnic" value={formData.cnic} onChange={handleChange} className="w-full p-2.5 border rounded-xl font-mono" placeholder="00000-0000000-0" />
                 </div>
             </div>
-
+            {mode === 'affiliated' && (
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Car Models (Affiliated)</label>
+                    <input
+                        name="car_models"
+                        value={formData.car_models || ''}
+                        onChange={handleChange}
+                        className="w-full p-2.5 border rounded-xl"
+                        placeholder="E.g. Honda Civic, Toyota Corolla (comma separated)"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Add multiple models separated by commas</p>
+                </div>
+            )}
             {/* Documents Section */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                 <h4 className="font-bold text-slate-700 text-sm uppercase">Documents</h4>
@@ -580,6 +605,8 @@ const CustomerForm: React.FC<{ onSave: (data: any) => void, initialData: any, mo
                     rows={3}
                 />
             </div>
+
+
 
             <button
                 onClick={handleFormSave}
