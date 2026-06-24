@@ -1164,3 +1164,88 @@ export const deletePartnerTransaction = async (id: string): Promise<void> => {
   const { error } = await supabase.from("partner_transactions").delete().eq("id", id);
   if (error) throw new Error(error.message);
 };
+
+// --- BULK OPERATIONS ---
+
+export const bulkCreateVehicles = async (vehicles: Omit<Vehicle, "id" | "tenant_id">[]): Promise<Vehicle[]> => {
+  const { data, error } = await supabase
+    .from("vehicles")
+    .insert(vehicles.map(v => ({ ...v, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as Vehicle[];
+};
+
+export const bulkCreateCustomers = async (customers: Omit<Customer, "id" | "tenant_id">[]): Promise<Customer[]> => {
+  const { data, error } = await supabase
+    .from("customers")
+    .insert(customers.map(c => ({ ...c, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as Customer[];
+};
+
+export const bulkCreateDrivers = async (drivers: Omit<Driver, "id" | "tenant_id">[]): Promise<Driver[]> => {
+  const { data, error } = await supabase
+    .from("drivers")
+    .insert(drivers.map(d => ({ ...d, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as Driver[];
+};
+
+export const bulkCreateRentals = async (rentals: Omit<Rental, "id" | "tenant_id">[]): Promise<Rental[]> => {
+  // To prevent duplicates, we can't easily use upsert with arbitrary columns without unique constraints in DB.
+  // We'll perform a check for each rental before inserting.
+  // For better performance, we'll fetch existing rentals for the involved vehicles.
+  const vehicleIds = Array.from(new Set(rentals.map(r => r.vehicle_id)));
+  const { data: existing } = await supabase
+    .from("rentals")
+    .select("vehicle_id, start_time, odometer_start")
+    .in("vehicle_id", vehicleIds)
+    .eq("tenant_id", TENANT_ID);
+
+  const existingMap = new Set(existing?.map(e => `${e.vehicle_id}|${e.start_time}|${e.odometer_start}`) || []);
+
+  const toInsert = rentals.filter(r => !existingMap.has(`${r.vehicle_id}|${r.start_time}|${r.odometer_start}`));
+
+  if (toInsert.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("rentals")
+    .insert(toInsert.map(r => ({ ...r, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as Rental[];
+};
+
+export const bulkCreateMaintenance = async (records: Omit<MaintenanceRecord, "id" | "tenant_id">[]): Promise<MaintenanceRecord[]> => {
+  const vehicleIds = Array.from(new Set(records.map(r => r.vehicle_id)));
+  const { data: existing } = await supabase
+    .from("maintenance_records")
+    .select("vehicle_id, date, type, odometer")
+    .in("vehicle_id", vehicleIds)
+    .eq("tenant_id", TENANT_ID);
+
+  const existingMap = new Set(existing?.map(e => `${e.vehicle_id}|${e.date}|${e.type}|${e.odometer}`) || []);
+
+  const toInsert = records.filter(r => !existingMap.has(`${r.vehicle_id}|${r.date}|${r.type}|${r.odometer}`));
+
+  if (toInsert.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("maintenance_records")
+    .insert(toInsert.map(r => ({ ...r, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as MaintenanceRecord[];
+};
+
+export const bulkCreatePartnerTransactions = async (transactions: Omit<PartnerTransaction, "id" | "tenant_id" | "created_at">[]): Promise<PartnerTransaction[]> => {
+  const { data, error } = await supabase
+    .from("partner_transactions")
+    .insert(transactions.map(t => ({ ...t, tenant_id: TENANT_ID })))
+    .select();
+  if (error) throw new Error(error.message);
+  return data as PartnerTransaction[];
+};

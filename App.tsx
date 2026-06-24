@@ -11,9 +11,10 @@ import { MenuIcon, LogoIcon } from './components/icons';
 import CustomersView from './views/CustomersView';
 import DriversView from './views/DriversView';
 import SettingsView from './views/SettingsView';
+import ImportView from './views/ImportView';
 import { Toaster } from 'react-hot-toast';
 
-type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings';
+type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings' | 'import';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -41,6 +42,8 @@ const App: React.FC = () => {
         return <DriversView />;
       case 'settings':
         return <SettingsView />;
+      case 'import':
+        return <ImportView />;
       default:
         return <DashboardView />;
     }
