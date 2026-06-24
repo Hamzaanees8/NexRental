@@ -4,6 +4,7 @@ import { getFinanceSummary, getTrips, getVehicles, getMaintenanceHistory, getRen
 import { FinancialSummary, Trip, Vehicle, TripStatus, VehicleStatus, MaintenanceRecord, Rental, RentalStatus, Customer } from '../types';
 import Card from '../components/Card';
 import { STATUS_COLORS, formatCurrency, CHART_COLORS } from '../constants';
+import { calculateMaintenanceAlerts, MaintenanceAlert } from '../services/maintenanceAlerts';
 
 const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setCurrentView }) => {
   console.log("DashboardView rendering");
@@ -13,6 +14,7 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Date Range Filtering
@@ -47,6 +49,7 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
         setCustomers(customersData);
         setVehicles(vehiclesData);
         setMaintenanceRecords(maintenanceData);
+        setMaintenanceAlerts(calculateMaintenanceAlerts(vehiclesData, maintenanceData));
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -178,6 +181,30 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
           </p>
         </Card>
       </div>
+
+      {/* Maintenance Alerts */}
+      {maintenanceAlerts.length > 0 && (
+        <Card title="Maintenance Alerts" className="mb-6 border-l-4 border-l-orange-500">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {maintenanceAlerts.map((alert, idx) => (
+              <div key={`${alert.vehicleId}-${alert.type}-${idx}`} className={`p-3 rounded-xl border flex items-center justify-between ${alert.status === 'overdue' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
+                <div>
+                  <p className="font-bold text-slate-800 text-sm">{alert.licensePlate}</p>
+                  <p className="text-xs text-slate-600">{alert.type}</p>
+                </div>
+                <div className="text-right">
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${alert.status === 'overdue' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'}`}>
+                    {alert.status === 'overdue' ? 'Overdue' : 'Due Soon'}
+                  </span>
+                  <p className={`text-xs font-bold mt-1 ${alert.status === 'overdue' ? 'text-red-600' : 'text-orange-600'}`}>
+                    {alert.status === 'overdue' ? `By ${Math.abs(alert.remainingKm).toLocaleString()} km` : `In ${alert.remainingKm.toLocaleString()} km`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card title={`Financial Trend (${startDate} to ${endDate})`} className="mb-6">
         <ResponsiveContainer width="100%" height={300}>

@@ -7,6 +7,13 @@ export const TRIP_TERMINALS = ['Lahore', 'Sargodha', 'Islamabad', 'Multan', 'Kar
 export const EXPENSE_TYPES = Object.values(MaintenanceType);
 export const RIDE_EXPENSE_TYPES = ['Fuel', 'Toll', 'Driver Allowance', 'Cleaning', 'Repair', 'Parking', 'Other'];
 
+export const MAINTENANCE_INTERVALS: Record<string, number> = {
+    [MaintenanceType.EngineOil]: 5000,
+    [MaintenanceType.Tuning]: 10000,
+    [MaintenanceType.GearOil]: 40000,
+    [MaintenanceType.TyreChange]: 50000,
+};
+
 export const STATUS_COLORS: { [key in VehicleStatus | TripStatus]: string } = {
     [VehicleStatus.Active]: 'bg-green-100 text-green-800',
     [VehicleStatus.InMaintenance]: 'bg-yellow-100 text-yellow-800',
@@ -22,6 +29,7 @@ export const TRANSACTION_TYPE_COLORS: { [key in TransactionType]: string } = {
     [TransactionType.PrivateHire]: 'text-blue-600',
     [TransactionType.Expense]: 'text-red-600',
     [TransactionType.MTagTopUp]: 'text-orange-600',
+    [TransactionType.MTagUsage]: 'text-amber-600',
     [TransactionType.RentalIncome]: 'text-emerald-600',
     [TransactionType.TripExpense]: 'text-rose-600',
 };
