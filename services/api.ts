@@ -12,6 +12,8 @@ import {
   PassengerLog,
   ContractType,
   AppSettings,
+  Partner,
+  PartnerTransaction,
 } from "../types";
 import { TENANT_ID } from "../constants";
 import { supabase, supabaseAdmin } from "./supabaseClient";
@@ -1069,4 +1071,71 @@ export const uploadFile = async (bucket: string, path: string, file: File): Prom
 
   const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
   return publicUrl;
+};
+
+// --- PARTNERS ---
+
+export const getPartners = async (): Promise<Partner[]> => {
+  const { data, error } = await supabase
+    .from("partners")
+    .select("*")
+    .eq("tenant_id", TENANT_ID);
+  if (error) throw new Error(error.message);
+  return data as Partner[];
+};
+
+export const createPartner = async (
+  partner: Omit<Partner, "id" | "tenant_id" | "created_at">
+): Promise<Partner> => {
+  const { data, error } = await supabase
+    .from("partners")
+    .insert([{ ...partner, tenant_id: TENANT_ID }])
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0] as Partner;
+};
+
+export const deletePartner = async (id: string): Promise<void> => {
+  const { error } = await supabase.from("partners").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+};
+
+// --- PARTNER TRANSACTIONS ---
+
+export const getPartnerTransactions = async (): Promise<PartnerTransaction[]> => {
+  const { data, error } = await supabase
+    .from("partner_transactions")
+    .select("*")
+    .eq("tenant_id", TENANT_ID);
+  if (error) throw new Error(error.message);
+  return data as PartnerTransaction[];
+};
+
+export const createPartnerTransaction = async (
+  transaction: Omit<PartnerTransaction, "id" | "tenant_id" | "created_at">
+): Promise<PartnerTransaction> => {
+  const { data, error } = await supabase
+    .from("partner_transactions")
+    .insert([{ ...transaction, tenant_id: TENANT_ID }])
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0] as PartnerTransaction;
+};
+
+export const updatePartnerTransaction = async (
+  id: string,
+  updates: Partial<PartnerTransaction>
+): Promise<PartnerTransaction> => {
+  const { data, error } = await supabase
+    .from("partner_transactions")
+    .update(updates)
+    .eq("id", id)
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0] as PartnerTransaction;
+};
+
+export const deletePartnerTransaction = async (id: string): Promise<void> => {
+  const { error } = await supabase.from("partner_transactions").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 };
