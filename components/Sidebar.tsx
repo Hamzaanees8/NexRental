@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardIcon, FleetIcon, TripIcon, FinanceIcon, MaintenanceIcon, LogoIcon, CloseIcon, SettingsIcon } from './icons';
 
-type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings' | 'import';
+type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings' | 'import' | 'roi';
 
 interface SidebarProps {
   currentView: View;
@@ -16,6 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
     { id: 'fleet', label: 'Fleet Management', icon: <FleetIcon /> },
     { id: 'rentals', label: 'Rental Management', icon: <TripIcon /> },
     { id: 'financials', label: 'Financials', icon: <FinanceIcon /> },
+    { id: 'roi', label: 'Car ROI & Analytics', icon: <span className="font-bold text-lg">%</span> },
     { id: 'maintenance', label: 'Maintenance', icon: <MaintenanceIcon /> },
     { id: 'customers', label: 'Customers', icon: <span className="font-bold text-lg">C</span> }, // Placeholder icon
     { id: 'affiliated', label: 'Affiliated', icon: <span className="font-bold text-lg">A</span> }, // Placeholder icon

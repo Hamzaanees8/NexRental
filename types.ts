@@ -28,6 +28,7 @@ export interface Vehicle {
   insurance_expiry?: string; // ISO date string
   token_tax_expiry?: string;  // ISO date string
   m_tag_id?: string;
+  purchase_price?: number;
 }
 
 export interface Customer {
