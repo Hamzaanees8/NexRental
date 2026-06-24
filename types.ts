@@ -277,3 +277,24 @@ export interface PartnerTransaction {
   description: string;
   created_at: string;
 }
+
+export enum ChallanStatus {
+  Unpaid = 'Unpaid',
+  Paid = 'Paid',
+}
+
+export interface Challan {
+  id: string;
+  tenant_id: string;
+  vehicle_id: string;
+  driver_id: string;
+  challan_number: string;
+  amount: number;
+  date: string;
+  violation_type: string;
+  notes?: string;
+  is_driver_liable: boolean;
+  is_business_absorbed: boolean;
+  status: ChallanStatus;
+  created_at: string;
+}
