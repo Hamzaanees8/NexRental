@@ -8,6 +8,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { PlusIcon } from '../components/icons';
 import { STATUS_COLORS, VEHICLE_TYPES, formatCurrency } from '../constants';
 import { calculateMaintenanceAlerts, MaintenanceAlert } from '../services/maintenanceAlerts';
+import { checkDocumentStatus } from '../services/expiryAlerts';
 import toast from 'react-hot-toast';
 
 const FleetView: React.FC = () => {
@@ -245,8 +246,12 @@ const FleetView: React.FC = () => {
           const hasOverdue = vehicleAlerts.some(a => a.status === 'overdue');
           const hasDueSoon = vehicleAlerts.some(a => a.status === 'due_soon');
 
+          const insuranceStatus = checkDocumentStatus(vehicle.insurance_expiry);
+          const tokenTaxStatus = checkDocumentStatus(vehicle.token_tax_expiry);
+          const hasDocumentWarning = insuranceStatus !== 'valid' || tokenTaxStatus !== 'valid';
+
           return (
-            <div key={vehicle.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${hasOverdue ? 'border-red-200 bg-red-50/30' : hasDueSoon ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
+            <div key={vehicle.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${hasOverdue || insuranceStatus === 'expired' || tokenTaxStatus === 'expired' ? 'border-red-200 bg-red-50/30' : hasDueSoon || insuranceStatus === 'expiring_soon' || tokenTaxStatus === 'expiring_soon' ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
             <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition px-2">
               <button
                 onClick={(e) => { e.stopPropagation(); handleOpenModal(vehicle); }}
@@ -275,17 +280,33 @@ const FleetView: React.FC = () => {
                     {vehicle.status}
                   </span>
                 </div>
-                {vehicleAlerts.length > 0 && (
+                {(vehicleAlerts.length > 0 || hasDocumentWarning) && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {vehicleAlerts.map((alert, idx) => (
                       <span
-                        key={idx}
+                        key={`maint-${idx}`}
                         title={`${alert.type}: ${alert.status === 'overdue' ? 'Overdue' : 'Due Soon'}`}
                         className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${alert.status === 'overdue' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}
                       >
                         ⚠️ {alert.type}
                       </span>
                     ))}
+                    {insuranceStatus !== 'valid' && (
+                      <span
+                        title={`Insurance ${insuranceStatus === 'expired' ? 'Expired' : 'Expiring Soon'}`}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${insuranceStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}
+                      >
+                        ⚠️ Insurance {insuranceStatus === 'expired' ? 'Expired' : 'Expiring Soon'}
+                      </span>
+                    )}
+                    {tokenTaxStatus !== 'valid' && (
+                      <span
+                        title={`Token Tax ${tokenTaxStatus === 'expired' ? 'Expired' : 'Expiring Soon'}`}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${tokenTaxStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}
+                      >
+                        ⚠️ Token Tax {tokenTaxStatus === 'expired' ? 'Expired' : 'Expiring Soon'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -294,13 +315,13 @@ const FleetView: React.FC = () => {
                   {vehicle.insurance_expiry && (
                     <span
                       title={`Insurance Exp: ${new Date(vehicle.insurance_expiry).toLocaleDateString()}`}
-                      className={`w-2 h-2 rounded-full ${(new Date(vehicle.insurance_expiry).getTime() - new Date().getTime()) / 86400000 < 15 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}
+                      className={`w-2 h-2 rounded-full ${insuranceStatus === 'expired' ? 'bg-red-500 animate-pulse' : insuranceStatus === 'expiring_soon' ? 'bg-orange-500' : 'bg-green-500'}`}
                     ></span>
                   )}
                   {vehicle.token_tax_expiry && (
                     <span
                       title={`Token Tax Exp: ${new Date(vehicle.token_tax_expiry).toLocaleDateString()}`}
-                      className={`w-2 h-2 rounded-full ${(new Date(vehicle.token_tax_expiry).getTime() - new Date().getTime()) / 86400000 < 15 ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}
+                      className={`w-2 h-2 rounded-full ${tokenTaxStatus === 'expired' ? 'bg-red-500 animate-pulse' : tokenTaxStatus === 'expiring_soon' ? 'bg-orange-500' : 'bg-blue-500'}`}
                     ></span>
                   )}
                 </div>

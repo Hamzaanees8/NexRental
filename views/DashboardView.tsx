@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { getFinanceSummary, getTrips, getVehicles, getMaintenanceHistory, getRentals, getCustomers } from '../services/api';
-import { FinancialSummary, Trip, Vehicle, TripStatus, VehicleStatus, MaintenanceRecord, Rental, RentalStatus, Customer } from '../types';
+import { getFinanceSummary, getTrips, getVehicles, getMaintenanceHistory, getRentals, getCustomers, getDrivers } from '../services/api';
+import { FinancialSummary, Trip, Vehicle, TripStatus, VehicleStatus, MaintenanceRecord, Rental, RentalStatus, Customer, Driver } from '../types';
 import Card from '../components/Card';
 import { STATUS_COLORS, formatCurrency, CHART_COLORS } from '../constants';
 import { calculateMaintenanceAlerts, MaintenanceAlert } from '../services/maintenanceAlerts';
+import { getExpiredDocuments, DocumentAlert } from '../services/expiryAlerts';
 
 const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setCurrentView }) => {
   console.log("DashboardView rendering");
@@ -13,8 +14,10 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
+  const [documentAlerts, setDocumentAlerts] = useState<DocumentAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Date Range Filtering
@@ -34,12 +37,13 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
       console.log("fetchData called");
       try {
         setLoading(true);
-        const [summaryData, tripsData, rentalsData, customersData, vehiclesData, maintenanceData] = await Promise.all([
+        const [summaryData, tripsData, rentalsData, customersData, vehiclesData, driversData, maintenanceData] = await Promise.all([
           getFinanceSummary(),
           getTrips(),
           getRentals(),
           getCustomers(),
           getVehicles(),
+          getDrivers(),
           getMaintenanceHistory(),
         ]);
         console.log({ summaryData, tripsData, vehiclesData, maintenanceData });
@@ -48,8 +52,10 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
         setRentals(rentalsData);
         setCustomers(customersData);
         setVehicles(vehiclesData);
+        setDrivers(driversData);
         setMaintenanceRecords(maintenanceData);
         setMaintenanceAlerts(calculateMaintenanceAlerts(vehiclesData, maintenanceData));
+        setDocumentAlerts(getExpiredDocuments(vehiclesData, driversData));
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -182,28 +188,57 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
         </Card>
       </div>
 
-      {/* Maintenance Alerts */}
-      {maintenanceAlerts.length > 0 && (
-        <Card title="Maintenance Alerts" className="mb-6 border-l-4 border-l-orange-500">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {maintenanceAlerts.map((alert, idx) => (
-              <div key={`${alert.vehicleId}-${alert.type}-${idx}`} className={`p-3 rounded-xl border flex items-center justify-between ${alert.status === 'overdue' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
-                <div>
-                  <p className="font-bold text-slate-800 text-sm">{alert.licensePlate}</p>
-                  <p className="text-xs text-slate-600">{alert.type}</p>
-                </div>
-                <div className="text-right">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${alert.status === 'overdue' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'}`}>
-                    {alert.status === 'overdue' ? 'Overdue' : 'Due Soon'}
-                  </span>
-                  <p className={`text-xs font-bold mt-1 ${alert.status === 'overdue' ? 'text-red-600' : 'text-orange-600'}`}>
-                    {alert.status === 'overdue' ? `By ${Math.abs(alert.remainingKm).toLocaleString()} km` : `In ${alert.remainingKm.toLocaleString()} km`}
-                  </p>
-                </div>
+      {/* Alerts Section */}
+      {(maintenanceAlerts.length > 0 || documentAlerts.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Maintenance Alerts */}
+          {maintenanceAlerts.length > 0 && (
+            <Card title="Maintenance Alerts" className="border-l-4 border-l-orange-500">
+              <div className="grid gap-3 sm:grid-cols-1">
+                {maintenanceAlerts.map((alert, idx) => (
+                  <div key={`${alert.vehicleId}-${alert.type}-${idx}`} className={`p-3 rounded-xl border flex items-center justify-between ${alert.status === 'overdue' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{alert.licensePlate}</p>
+                      <p className="text-xs text-slate-600">{alert.type}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${alert.status === 'overdue' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'}`}>
+                        {alert.status === 'overdue' ? 'Overdue' : 'Due Soon'}
+                      </span>
+                      <p className={`text-xs font-bold mt-1 ${alert.status === 'overdue' ? 'text-red-600' : 'text-orange-600'}`}>
+                        {alert.status === 'overdue' ? `By ${Math.abs(alert.remainingKm).toLocaleString()} km` : `In ${alert.remainingKm.toLocaleString()} km`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          )}
+
+          {/* Document Expiry Alerts */}
+          {documentAlerts.length > 0 && (
+            <Card title="Document Expiry Warnings" className="border-l-4 border-l-red-500">
+              <div className="grid gap-3 sm:grid-cols-1">
+                {documentAlerts.map((alert, idx) => (
+                  <div key={`${alert.entityId}-${alert.type}-${idx}`} className={`p-3 rounded-xl border flex items-center justify-between ${alert.status === 'expired' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{alert.entityName}</p>
+                      <p className="text-xs text-slate-600">{alert.type}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${alert.status === 'expired' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'}`}>
+                        {alert.status === 'expired' ? 'Expired' : 'Expiring Soon'}
+                      </span>
+                      <p className={`text-xs font-bold mt-1 ${alert.status === 'expired' ? 'text-red-600' : 'text-orange-600'}`}>
+                        {alert.status === 'expired' ? `${Math.abs(alert.daysDiff)} days ago` : `In ${alert.daysDiff} days`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
       )}
 
       <Card title={`Financial Trend (${startDate} to ${endDate})`} className="mb-6">

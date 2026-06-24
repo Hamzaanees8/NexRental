@@ -3,6 +3,7 @@ import { getDrivers, createDriver, updateDriver, deleteDriver, uploadFile } from
 import { Driver } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
+import { checkDocumentStatus } from '../services/expiryAlerts';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ImagePreviewModal from '../components/ImagePreviewModal';
@@ -141,54 +142,75 @@ const DriversView: React.FC = () => {
 
             {/* Grid */}
             <div className="grid gap-4 sm:grid-cols-2">
-                {filteredDrivers.map(driver => (
-                    <div key={driver.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition relative group pt-8">
-                        <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition">
-                            <button
-                                onClick={() => openEditModal(driver)}
-                                className="p-1.5 cursor-pointer text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                title="Edit"
-                            >
-                                ✎
-                            </button>
-                            <button
-                                onClick={() => handleDeleteClick(driver.id)}
-                                className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Delete"
-                            >
-                                🗑
-                            </button>
-                        </div>
-                        <div className="flex justify-between items-start mb-3">
-                            <div>
-                                <h3 className="font-bold text-lg text-slate-800">{driver.name}</h3>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-slate-500 text-sm font-mono">{driver.phone}</p>
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGES[driver.status as keyof typeof STATUS_BADGES]}`}>
-                                        {driver.status}
+                {filteredDrivers.map(driver => {
+                    const licenseStatus = checkDocumentStatus(driver.license_expiry);
+                    const cnicStatus = checkDocumentStatus(driver.cnic_expiry);
+
+                    return (
+                        <div key={driver.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${licenseStatus === 'expired' || cnicStatus === 'expired' ? 'border-red-200 bg-red-50/30' : licenseStatus === 'expiring_soon' || cnicStatus === 'expiring_soon' ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
+                            <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition">
+                                <button
+                                    onClick={() => openEditModal(driver)}
+                                    className="p-1.5 cursor-pointer text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                    title="Edit"
+                                >
+                                    ✎
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteClick(driver.id)}
+                                    className="p-1.5 cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                    title="Delete"
+                                >
+                                    🗑
+                                </button>
+                            </div>
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-800">{driver.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-slate-500 text-sm font-mono">{driver.phone}</p>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGES[driver.status as keyof typeof STATUS_BADGES]}`}>
+                                            {driver.status}
+                                        </span>
+                                    </div>
+                                    {(licenseStatus !== 'valid' || cnicStatus !== 'valid') && (
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {licenseStatus !== 'valid' && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${licenseStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
+                                                    ⚠️ License {licenseStatus === 'expired' ? 'Expired' : 'Expiring Soon'}
+                                                </span>
+                                            )}
+                                            {cnicStatus !== 'valid' && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${cnicStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
+                                                    ⚠️ CNIC {cnicStatus === 'expired' ? 'Expired' : 'Expiring Soon'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="pt-3 mt-3 border-t border-slate-50 space-y-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-400 font-mono">{driver.license_no}</span>
+                                    {driver.base_salary && (
+                                        <span className="font-bold text-slate-700">{formatCurrency(driver.base_salary)} / month</span>
+                                    )}
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className={`text-slate-400 ${cnicStatus === 'expired' ? 'text-red-600 font-bold' : cnicStatus === 'expiring_soon' ? 'text-orange-600 font-bold' : ''}`}>
+                                        CNIC: {driver.cnic || 'N/A'} {driver.cnic_expiry && `(Exp: ${new Date(driver.cnic_expiry).toLocaleDateString()})`}
                                     </span>
+                                    {driver.license_expiry && (
+                                        <span className={`font-medium ${licenseStatus === 'expired' ? 'text-red-600 font-bold' : licenseStatus === 'expiring_soon' ? 'text-orange-600 font-bold' : 'text-slate-400'}`}>
+                                            License Exp: {new Date(driver.license_expiry).toLocaleDateString()}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
-
-                        <div className="pt-3 mt-3 border-t border-slate-50 space-y-2">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-400 font-mono">{driver.license_no}</span>
-                                {driver.base_salary && (
-                                    <span className="font-bold text-slate-700">{formatCurrency(driver.base_salary)} / month</span>
-                                )}
-                            </div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400">CNIC: {driver.cnic || 'N/A'}</span>
-                                {driver.license_expiry && (
-                                    <span className={`font-medium ${new Date(driver.license_expiry) < new Date() ? 'text-red-600' : (new Date(driver.license_expiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) < 30 ? 'text-orange-600' : 'text-slate-400'}`}>
-                                        License Expiry: {new Date(driver.license_expiry).toLocaleDateString()}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Modal */}
