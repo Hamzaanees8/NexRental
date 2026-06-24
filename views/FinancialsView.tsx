@@ -232,7 +232,15 @@ const FinancialsView: React.FC = () => {
     .filter(t => t.type === TransactionType.Expense && !t.vehicle_id)
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const cashInHandPKR = openingBalance + totalRentalNetProfits + partnerContributions - partnerDrawings - generalExpenses;
+  const totalMTagTopUps = transactions
+    .filter(t => t.type === TransactionType.MTagTopUp)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalMTagUsage = transactions
+    .filter(t => t.type === TransactionType.MTagUsage)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const cashInHandPKR = openingBalance + totalRentalNetProfits + totalMTagUsage + partnerContributions - partnerDrawings - generalExpenses - totalMTagTopUps;
 
   const reservesPKR = reserves.reduce((sum, r) => sum + (r.amount * r.exchange_rate), 0);
   const totalCashAssets = cashInHandPKR + reservesPKR;

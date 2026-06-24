@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getVehicles, createVehicle, updateVehicle, deleteVehicle, updateMTagBalance, getTransactions, deleteMTagTransaction, editMTagTransaction, getMaintenanceHistory } from '../services/api';
+import { getVehicles, createVehicle, updateVehicle, deleteVehicle, updateMTagBalance, getTransactions, deleteMTagTransaction, editMTagTransaction, getMaintenanceHistory, recordMTagTopUp } from '../services/api';
 import { Vehicle, VehicleStatus, TransactionType, MaintenanceRecord } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -162,10 +162,17 @@ const FleetView: React.FC = () => {
   }
 
   const handleTopUp = async () => {
-    if (!topUpVehicle || !topUpAmount) return;
+    if (!topUpVehicle) return;
+    if (!topUpAmount || Number(topUpAmount) <= 0) {
+      toast.error("Please enter an amount greater than 0");
+      return;
+    }
     try {
-      const type = mtagAction === 'add' ? TransactionType.MTagTopUp : TransactionType.MTagUsage;
-      await updateMTagBalance(topUpVehicle.id, Number(topUpAmount), type, mtagDate);
+      if (mtagAction === 'add') {
+        await recordMTagTopUp(topUpVehicle.id, Number(topUpAmount), mtagDate);
+      } else {
+        await updateMTagBalance(topUpVehicle.id, Number(topUpAmount), TransactionType.MTagUsage, mtagDate);
+      }
       toast.success(`M-Tag balance ${mtagAction === 'add' ? 'topped up' : 'adjusted'}`);
       setIsTopUpOpen(false);
       setTopUpVehicle(null);
@@ -280,8 +287,23 @@ const FleetView: React.FC = () => {
                     {vehicle.status}
                   </span>
                 </div>
-                {(vehicleAlerts.length > 0 || hasDocumentWarning) && (
+                {(vehicleAlerts.length > 0 || hasDocumentWarning || (vehicle.m_tag_balance || 0) < 1000) && (
                   <div className="flex flex-wrap gap-1 mt-2">
+                    {(vehicle.m_tag_balance || 0) < 0 ? (
+                      <span
+                        title="M-Tag Balance Negative"
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-red-600 text-white animate-pulse"
+                      >
+                        🔴 M-Tag Balance Negative
+                      </span>
+                    ) : (vehicle.m_tag_balance || 0) < 1000 && (
+                      <span
+                        title="M-Tag Low Balance"
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-orange-500 text-white"
+                      >
+                        ⚠️ M-Tag Low Balance
+                      </span>
+                    )}
                     {vehicleAlerts.map((alert, idx) => (
                       <span
                         key={`maint-${idx}`}
@@ -332,7 +354,7 @@ const FleetView: React.FC = () => {
               <div>
                 <p className="text-xs text-slate-400">M-Tag Balance</p>
                 <div className="flex items-center gap-2">
-                  <span className={`font-mono font-bold text-lg ${(vehicle.m_tag_balance || 0) < 500 ? 'text-red-500' : 'text-slate-700'}`}>
+                  <span className={`font-mono font-bold text-lg ${(vehicle.m_tag_balance || 0) < 1000 ? 'text-red-500' : 'text-slate-700'}`}>
                     {formatCurrency(vehicle.m_tag_balance || 0)}
                   </span>
                   <button onClick={(e) => openTopUp(e, vehicle)} className="text-xs bg-blue-50 text-blue-600 px-3 py-2 rounded-lg hover:bg-blue-100 font-medium cursor-pointer transition">
