@@ -700,6 +700,26 @@ export const updateRental = async (
         };
         await supabase.from("financial_transactions").insert([expenseTx]);
       }
+
+      // Automate M-Tag deduction upon rental settlement
+      if (updated.toll_cost && updated.toll_cost > 0) {
+        // Check if transactions already exist for this rental to avoid duplicates
+        const { data: existingMTagTx } = await supabase
+          .from("financial_transactions")
+          .select("id")
+          .eq("rental_id", id)
+          .eq("type", TransactionType.MTagUsage);
+
+        if (!existingMTagTx || existingMTagTx.length === 0) {
+          await updateMTagBalance(
+            updated.vehicle_id,
+            updated.toll_cost,
+            TransactionType.MTagUsage,
+            new Date().toISOString(),
+            id
+          );
+        }
+      }
     }
   } 
   // 4. If changing status FROM a finalized state (Settled/Completed) to something else, remove transactions
@@ -842,20 +862,22 @@ export const completeRental = async (
   if (updateError) throw new Error(updateError.message);
 
   // 3. Update Vehicle (Odometer + M-Tag Deduction)
-  const { data: vehicle } = await supabase
-    .from("vehicles")
-    .select("m_tag_balance")
-    .eq("id", rental.vehicle_id)
-    .single();
-  const currentMTag = vehicle?.m_tag_balance || 0;
-
   await supabase
     .from("vehicles")
     .update({
       current_odometer: completionData.odometer_end,
-      m_tag_balance: currentMTag - completionData.toll_cost,
     })
     .eq("id", rental.vehicle_id);
+
+  if (completionData.toll_cost > 0) {
+    await updateMTagBalance(
+      rental.vehicle_id,
+      completionData.toll_cost,
+      TransactionType.MTagUsage,
+      new Date().toISOString(),
+      id
+    );
+  }
 
   // 4. Create Financial Transaction (Income)
   await supabase.from("financial_transactions").insert([
@@ -893,7 +915,8 @@ export const updateMTagBalance = async (
   vehicleId: string,
   amount: number,
   type: TransactionType.MTagTopUp | TransactionType.MTagUsage,
-  date?: string
+  date?: string,
+  rentalId?: string
 ): Promise<Vehicle> => {
   // 1. Get current vehicle
   const { data: vehicle, error: fetchError } = await supabase
@@ -923,16 +946,26 @@ export const updateMTagBalance = async (
     {
       tenant_id: TENANT_ID,
       vehicle_id: vehicleId,
+      rental_id: rentalId,
       type: type,
       amount: amount,
       description: isUsage 
         ? `M-Tag Usage deduction for ${vehicle.license_plate}` 
-        : `M-Tag Top Up for ${vehicle.license_plate}`,
+        : `M-Tag Top-Up for vehicle ${vehicle.license_plate}`,
       date: date || new Date().toISOString(),
     },
   ]);
 
   return updatedVehicle as Vehicle;
+};
+
+// Top up M-Tag and record in ledger
+export const recordMTagTopUp = async (
+  vehicleId: string,
+  amount: number,
+  date: string
+) => {
+  return updateMTagBalance(vehicleId, amount, TransactionType.MTagTopUp, date);
 };
 
 // Deprecated alias for compatibility
