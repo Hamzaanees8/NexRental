@@ -238,3 +238,27 @@ export interface AppSettings {
   locations: string[];
   per_km_cost: number;
 }
+
+export enum PartnerTransactionType {
+  Contribution = 'Contribution',
+  Drawing = 'Drawing',
+  CommitteeAdjustment = 'Committee Adjustment',
+}
+
+export interface Partner {
+  id: string;
+  tenant_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface PartnerTransaction {
+  id: string;
+  tenant_id: string;
+  partner_id: string;
+  type: PartnerTransactionType;
+  amount: number;
+  date: string;
+  description: string;
+  created_at: string;
+}
