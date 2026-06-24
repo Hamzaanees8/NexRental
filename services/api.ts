@@ -14,6 +14,7 @@ import {
   AppSettings,
   Partner,
   PartnerTransaction,
+  ForeignCurrencyReserve,
 } from "../types";
 import { TENANT_ID } from "../constants";
 import { supabase, supabaseAdmin } from "./supabaseClient";
@@ -1098,6 +1099,30 @@ export const createPartner = async (
 export const deletePartner = async (id: string): Promise<void> => {
   const { error } = await supabase.from("partners").delete().eq("id", id);
   if (error) throw new Error(error.message);
+};
+
+// --- FOREIGN CURRENCY RESERVES ---
+
+export const getForeignCurrencyReserves = async (): Promise<ForeignCurrencyReserve[]> => {
+  const { data, error } = await supabase
+    .from("foreign_currency_reserves")
+    .select("*")
+    .eq("tenant_id", TENANT_ID);
+  if (error) throw new Error(error.message);
+  return data as ForeignCurrencyReserve[];
+};
+
+export const updateForeignCurrencyReserve = async (
+  id: string,
+  updates: Partial<ForeignCurrencyReserve>
+): Promise<ForeignCurrencyReserve> => {
+  const { data, error } = await supabase
+    .from("foreign_currency_reserves")
+    .update(updates)
+    .eq("id", id)
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0] as ForeignCurrencyReserve;
 };
 
 // --- PARTNER TRANSACTIONS ---

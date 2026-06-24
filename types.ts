@@ -242,6 +242,16 @@ export interface AppSettings {
   tenant_id: string;
   locations: string[];
   per_km_cost: number;
+  opening_balance?: number;
+}
+
+export interface ForeignCurrencyReserve {
+  id: string;
+  tenant_id: string;
+  currency: string;
+  amount: number;
+  exchange_rate: number;
+  updated_at: string;
 }
 
 export enum PartnerTransactionType {
