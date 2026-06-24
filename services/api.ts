@@ -404,6 +404,16 @@ export const updateMaintenanceRecord = async (
 
   const updated = data[0] as MaintenanceRecord;
 
+  // Odometer sync hook
+  if (updated.odometer && updated.vehicle_id) {
+    const vehicle = await getVehicle(updated.vehicle_id);
+    if (vehicle && updated.odometer > (vehicle.current_odometer || 0)) {
+      await updateVehicle(updated.vehicle_id, {
+        current_odometer: updated.odometer,
+      });
+    }
+  }
+
   // 3. Find and update the associated financial transaction
   // We look for an Expense transaction with matching vehicle_id and close date/amount
   const { data: existingTx } = await supabase
@@ -488,12 +498,15 @@ export const createMaintenanceRecord = async (
   };
   await createExpense(newTransaction);
 
-  // // Update vehicle's current_odometer if provided in the maintenance record
-  // if (newRecord.odometer) {
-  //   await updateVehicle(newRecord.vehicle_id, {
-  //     current_odometer: newRecord.odometer,
-  //   });
-  // }
+  // Update vehicle's current_odometer if provided in the maintenance record and greater than current
+  if (newRecord.odometer) {
+    const vehicleData = await getVehicle(newRecord.vehicle_id);
+    if (vehicleData && newRecord.odometer > (vehicleData.current_odometer || 0)) {
+      await updateVehicle(newRecord.vehicle_id, {
+        current_odometer: newRecord.odometer,
+      });
+    }
+  }
 
   return data[0] as MaintenanceRecord;
 };

@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { getVehicles, createVehicle, updateVehicle, deleteVehicle, updateMTagBalance, getTransactions, deleteMTagTransaction, editMTagTransaction } from '../services/api';
-import { Vehicle, VehicleStatus, TransactionType } from '../types';
+import { getVehicles, createVehicle, updateVehicle, deleteVehicle, updateMTagBalance, getTransactions, deleteMTagTransaction, editMTagTransaction, getMaintenanceHistory } from '../services/api';
+import { Vehicle, VehicleStatus, TransactionType, MaintenanceRecord } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { PlusIcon } from '../components/icons';
 import { STATUS_COLORS, VEHICLE_TYPES, formatCurrency } from '../constants';
+import { calculateMaintenanceAlerts, MaintenanceAlert } from '../services/maintenanceAlerts';
 import toast from 'react-hot-toast';
 
 const FleetView: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search State
@@ -44,12 +47,15 @@ const FleetView: React.FC = () => {
   const fetchVehicles = async () => {
     setLoading(true);
     try {
-      const [vData, tData] = await Promise.all([
+      const [vData, tData, mData] = await Promise.all([
         getVehicles(),
-        getTransactions()
+        getTransactions(),
+        getMaintenanceHistory()
       ]);
       setVehicles(vData);
       setTransactions(tData);
+      setMaintenanceRecords(mData);
+      setMaintenanceAlerts(calculateMaintenanceAlerts(vData, mData));
     } catch (error) {
       console.error("Failed to fetch vehicles:", error);
     } finally {
@@ -200,6 +206,8 @@ const FleetView: React.FC = () => {
     v.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getAlertsForVehicle = (vehicleId: string) => maintenanceAlerts.filter(a => a.vehicleId === vehicleId);
+
   if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading Fleet...</div>;
 
   return (
@@ -232,8 +240,13 @@ const FleetView: React.FC = () => {
 
       {/* Card Grid */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {filteredVehicles.map(vehicle => (
-          <div key={vehicle.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition relative group pt-8">
+        {filteredVehicles.map(vehicle => {
+          const vehicleAlerts = getAlertsForVehicle(vehicle.id);
+          const hasOverdue = vehicleAlerts.some(a => a.status === 'overdue');
+          const hasDueSoon = vehicleAlerts.some(a => a.status === 'due_soon');
+
+          return (
+            <div key={vehicle.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${hasOverdue ? 'border-red-200 bg-red-50/30' : hasDueSoon ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
             <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition px-2">
               <button
                 onClick={(e) => { e.stopPropagation(); handleOpenModal(vehicle); }}
@@ -262,6 +275,19 @@ const FleetView: React.FC = () => {
                     {vehicle.status}
                   </span>
                 </div>
+                {vehicleAlerts.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {vehicleAlerts.map((alert, idx) => (
+                      <span
+                        key={idx}
+                        title={`${alert.type}: ${alert.status === 'overdue' ? 'Overdue' : 'Due Soon'}`}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${alert.status === 'overdue' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}
+                      >
+                        ⚠️ {alert.type}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col items-end">
                 <div className="flex gap-1.5">
@@ -281,7 +307,7 @@ const FleetView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-between items-end mt-4 pt-4 border-t border-slate-50">
+            <div className={`flex justify-between items-end mt-4 pt-4 border-t ${hasOverdue ? 'border-red-100' : hasDueSoon ? 'border-orange-100' : 'border-slate-50'}`}>
               <div>
                 <p className="text-xs text-slate-400">M-Tag Balance</p>
                 <div className="flex items-center gap-2">
@@ -305,7 +331,8 @@ const FleetView: React.FC = () => {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {filteredVehicles.length === 0 && (
           <div className="text-center py-12 text-slate-400 col-span-full">
             <p>No vehicles found matching "{searchTerm}"</p>

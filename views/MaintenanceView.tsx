@@ -6,7 +6,7 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { PlusIcon } from '../components/icons';
-import { EXPENSE_TYPES, formatCurrency } from '../constants';
+import { EXPENSE_TYPES, formatCurrency, MAINTENANCE_INTERVALS } from '../constants';
 import toast from 'react-hot-toast';
 
 const MaintenanceView: React.FC = () => {
@@ -160,6 +160,16 @@ const MaintenanceView: React.FC = () => {
                 <div className="flex items-center gap-2 mb-3">
                   <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded uppercase">{r.type}</span>
                 </div>
+                <div className="grid grid-cols-2 gap-2 mb-3 text-[10px] font-mono text-slate-500 uppercase font-bold bg-slate-50 p-2 rounded-lg">
+                  <div>
+                    <span className="block text-slate-400">Odometer Now</span>
+                    <span>{r.odometer?.toLocaleString() || '---'} km</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-400">Next Due</span>
+                    <span className={r.next_due_odometer ? "text-indigo-600" : ""}>{r.next_due_odometer?.toLocaleString() || '---'} km</span>
+                  </div>
+                </div>
                 {r.notes && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded-lg italic select-text">{r.notes}</p>}
               </div>
               <div className="mt-4 text-right border-t pt-2">
@@ -217,6 +227,7 @@ const MaintenanceForm: React.FC<{
     type: MaintenanceType.Fuel,
     cost: 0,
     odometer: 0,
+    next_due_odometer: 0,
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -228,6 +239,7 @@ const MaintenanceForm: React.FC<{
         type: record.type,
         cost: record.cost,
         odometer: record.odometer || 0,
+        next_due_odometer: record.next_due_odometer || 0,
         date: new Date(record.date).toISOString().split('T')[0],
         notes: record.notes || ''
       });
@@ -236,7 +248,21 @@ const MaintenanceForm: React.FC<{
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: (name === 'cost' || name === 'odometer') ? Math.max(0, parseFloat(value) || 0) : value }));
+    const val = (name === 'cost' || name === 'odometer' || name === 'next_due_odometer') ? Math.max(0, parseFloat(value) || 0) : value;
+
+    setFormData(prev => {
+      const newState = { ...prev, [name]: val };
+
+      // Auto-suggest next_due_odometer
+      if (name === 'odometer' || name === 'type') {
+        const interval = MAINTENANCE_INTERVALS[newState.type];
+        if (interval) {
+          newState.next_due_odometer = newState.odometer + interval;
+        }
+      }
+
+      return newState;
+    });
   };
 
   return (
@@ -267,9 +293,13 @@ const MaintenanceForm: React.FC<{
           <input type="number" name="odometer" min="0" value={formData.odometer} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition font-mono" placeholder="0" />
         </div>
         <div>
-          <label className="block text-sm font-bold text-slate-700 mb-1">Date</label>
-          <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" required />
+          <label className="block text-sm font-bold text-slate-700 mb-1">Next Due Odometer</label>
+          <input type="number" name="next_due_odometer" min="0" value={formData.next_due_odometer} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition font-mono" placeholder="0" />
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-bold text-slate-700 mb-1">Date</label>
+        <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2.5 border rounded-xl bg-slate-50 focus:bg-white transition" required />
       </div>
       <div>
         <label className="block text-sm font-bold text-slate-700 mb-1">Notes / Description</label>

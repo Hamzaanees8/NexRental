@@ -211,7 +211,11 @@ export enum MaintenanceType {
   EngineRepair = 'Engine Repair',
   Fuel = 'Fuel',
   // Toll = 'Toll',
-  Other = 'Other'
+  Other = 'Other',
+  EngineOil = 'Engine Oil',
+  Tuning = 'Tuning',
+  GearOil = 'Gear Oil',
+  TyreChange = 'Tyre Change'
 }
 
 export interface MaintenanceRecord {
@@ -221,6 +225,7 @@ export interface MaintenanceRecord {
   type: MaintenanceType;
   cost: number;
   odometer?: number;
+  next_due_odometer?: number;
   date: string; // ISO date string
   notes: string;
 }
