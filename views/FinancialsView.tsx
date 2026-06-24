@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { getTransactions, createExpense, getVehicles, createPrivateHire, updateTransaction, deleteTransaction, getPartners, getPartnerTransactions, createPartnerTransaction, updatePartnerTransaction, deletePartnerTransaction } from '../services/api';
-import { Transaction, TransactionType, Vehicle, ContractType, Partner, PartnerTransaction, PartnerTransactionType } from '../types';
+import { getTransactions, createExpense, getVehicles, createPrivateHire, updateTransaction, deleteTransaction, getPartners, getPartnerTransactions, createPartnerTransaction, updatePartnerTransaction, deletePartnerTransaction, getSettings, updateSettings, getForeignCurrencyReserves, updateForeignCurrencyReserve, getRentals } from '../services/api';
+import { Transaction, TransactionType, Vehicle, ContractType, Partner, PartnerTransaction, PartnerTransactionType, AppSettings, ForeignCurrencyReserve, Rental, RentalStatus } from '../types';
 import { TRANSACTION_TYPE_COLORS, EXPENSE_TYPES, formatCurrency } from '../constants';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const FinancialsView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'partners'>('ledger');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'partners' | 'balance'>('ledger');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Balance Sheet State
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [reserves, setReserves] = useState<ForeignCurrencyReserve[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
 
   // Partner State
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -41,16 +46,22 @@ const FinancialsView: React.FC = () => {
   const fetchFinancialData = async () => {
     setLoading(true);
     try {
-      const [transData, vehiclesData, partnersData, partnerTransData] = await Promise.all([
+      const [transData, vehiclesData, partnersData, partnerTransData, settingsData, reservesData, rentalsData] = await Promise.all([
         getTransactions(),
         getVehicles(),
         getPartners(),
-        getPartnerTransactions()
+        getPartnerTransactions(),
+        getSettings(),
+        getForeignCurrencyReserves(),
+        getRentals()
       ]);
       setTransactions(transData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setVehicles(vehiclesData);
       setPartners(partnersData);
       setPartnerTransactions(partnerTransData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setSettings(settingsData);
+      setReserves(reservesData);
+      setRentals(rentalsData);
     } catch (error) {
       console.error("Failed to fetch financial data:", error);
     } finally {
@@ -202,6 +213,58 @@ const FinancialsView: React.FC = () => {
 
   const netProfit = totalRevenue - totalExpenses;
 
+  // Balance Sheet Calculations
+  const openingBalance = settings?.opening_balance || 0;
+
+  const totalRentalNetProfits = rentals
+    .filter(r => r.status === RentalStatus.Settled || r.status === RentalStatus.Completed)
+    .reduce((sum, r) => sum + (r.net_profit || 0), 0);
+
+  const partnerContributions = partnerTransactions
+    .filter(t => t.type === PartnerTransactionType.Contribution)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const partnerDrawings = partnerTransactions
+    .filter(t => t.type === PartnerTransactionType.Drawing)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const generalExpenses = transactions
+    .filter(t => t.type === TransactionType.Expense && !t.vehicle_id)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const cashInHandPKR = openingBalance + totalRentalNetProfits + partnerContributions - partnerDrawings - generalExpenses;
+
+  const reservesPKR = reserves.reduce((sum, r) => sum + (r.amount * r.exchange_rate), 0);
+  const totalCashAssets = cashInHandPKR + reservesPKR;
+
+  const totalPartnerCapital = partners.reduce((sum, p) => {
+    const pt = partnerTransactions.filter(t => t.partner_id === p.id);
+    const contributions = pt.filter(t => t.type === PartnerTransactionType.Contribution).reduce((s, t) => s + Number(t.amount), 0);
+    const drawings = pt.filter(t => t.type === PartnerTransactionType.Drawing).reduce((s, t) => s + Number(t.amount), 0);
+    const adjustments = pt.filter(t => t.type === PartnerTransactionType.CommitteeAdjustment).reduce((s, t) => s + Number(t.amount), 0);
+    return sum + (contributions - drawings + adjustments);
+  }, 0);
+
+  const handleUpdateReserve = async (id: string, amount: number, exchange_rate: number) => {
+    try {
+      await updateForeignCurrencyReserve(id, { amount, exchange_rate });
+      toast.success("Reserve updated");
+      fetchFinancialData();
+    } catch (error) {
+      toast.error("Failed to update reserve");
+    }
+  };
+
+  const handleUpdateOpeningBalance = async (newBalance: number) => {
+    try {
+      await updateSettings({ opening_balance: newBalance });
+      toast.success("Opening balance updated");
+      fetchFinancialData();
+    } catch (error) {
+      toast.error("Failed to update opening balance");
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading Financials...</div>;
 
   return (
@@ -245,6 +308,13 @@ const FinancialsView: React.FC = () => {
         >
           Partner Accounts
           {activeTab === 'partners' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
+        </button>
+        <button
+          onClick={() => setActiveTab('balance')}
+          className={`py-2 px-4 font-bold text-sm transition-colors relative ${activeTab === 'balance' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Balance Sheet
+          {activeTab === 'balance' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
         </button>
       </div>
 
@@ -341,7 +411,7 @@ const FinancialsView: React.FC = () => {
             )}
           </div>
         </>
-      ) : (
+      ) : activeTab === 'partners' ? (
         <PartnerAccountsView
           partners={partners}
           transactions={partnerTransactions}
@@ -356,6 +426,16 @@ const FinancialsView: React.FC = () => {
           onDeleteTransaction={(t) => {
             setPartnerDeleteModal({ isOpen: true, transaction: t });
           }}
+        />
+      ) : (
+        <BalanceSheetView
+          openingBalance={openingBalance}
+          cashInHandPKR={cashInHandPKR}
+          reserves={reserves}
+          totalCashAssets={totalCashAssets}
+          totalPartnerCapital={totalPartnerCapital}
+          onUpdateReserve={handleUpdateReserve}
+          onUpdateOpeningBalance={handleUpdateOpeningBalance}
         />
       )}
 
@@ -435,6 +515,157 @@ const FinancialsView: React.FC = () => {
         message={`Are you sure you want to delete this partner transaction? This cannot be undone.`}
         confirmLabel="Delete"
       />
+    </div>
+  );
+};
+
+const BalanceSheetView: React.FC<{
+  openingBalance: number;
+  cashInHandPKR: number;
+  reserves: ForeignCurrencyReserve[];
+  totalCashAssets: number;
+  totalPartnerCapital: number;
+  onUpdateReserve: (id: string, amount: number, rate: number) => void;
+  onUpdateOpeningBalance: (amount: number) => void;
+}> = ({ openingBalance, cashInHandPKR, reserves, totalCashAssets, totalPartnerCapital, onUpdateReserve, onUpdateOpeningBalance }) => {
+  const [localOpeningBalance, setLocalOpeningBalance] = useState(openingBalance);
+  const [editingReserves, setEditingReserves] = useState<{ [key: string]: { amount: number, rate: number } }>({});
+
+  useEffect(() => {
+    setLocalOpeningBalance(openingBalance);
+  }, [openingBalance]);
+
+  const discrepancy = Math.abs(totalCashAssets - totalPartnerCapital);
+  const hasDiscrepancy = discrepancy > 1;
+
+  return (
+    <div className="space-y-6">
+      {/* Assets vs Equity Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4 sm:px-0">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
+          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Total Cash Assets</p>
+          <p className="text-2xl font-mono font-bold text-slate-800">{formatCurrency(totalCashAssets)}</p>
+          <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Cash in Hand (PKR)</span>
+              <span className="font-mono font-bold">{formatCurrency(cashInHandPKR)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Foreign Reserves (PKR Eq.)</span>
+              <span className="font-mono font-bold">{formatCurrency(totalCashAssets - cashInHandPKR)}</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
+          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Total Partner Capital</p>
+          <p className="text-2xl font-mono font-bold text-indigo-600">{formatCurrency(totalPartnerCapital)}</p>
+          <p className="text-xs text-slate-400 mt-2">Sum of all partner equity balances</p>
+        </div>
+      </div>
+
+      {hasDiscrepancy && (
+        <div className="mx-4 sm:mx-0 bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-center gap-3 text-amber-800">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <p className="font-bold text-sm">Balance Sheet Discrepancy</p>
+            <p className="text-xs">There is a difference of {formatCurrency(discrepancy)} between Assets and Capital.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Foreign Currency Wallet */}
+      <div className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden mx-4 sm:mx-0">
+        <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800">Foreign Currency Reserves</h3>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {reserves.length > 0 ? reserves.map(r => {
+            const isEditing = editingReserves[r.id];
+            const currentAmount = isEditing ? editingReserves[r.id].amount : r.amount;
+            const currentRate = isEditing ? editingReserves[r.id].rate : r.exchange_rate;
+
+            return (
+              <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
+                    {r.currency === 'GBP' ? '£' : r.currency === 'EUR' ? '€' : '$'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800">{r.currency} Wallet</h4>
+                    <p className="text-xs text-slate-500">PKR Equivalent: <span className="font-mono font-bold text-slate-700">{formatCurrency(currentAmount * currentRate)}</span></p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Amount</label>
+                    <input
+                      type="number"
+                      className="w-24 p-2 border rounded text-sm font-mono"
+                      value={currentAmount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setEditingReserves({ ...editingReserves, [r.id]: { amount: val, rate: currentRate } });
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Rate</label>
+                    <input
+                      type="number"
+                      className="w-24 p-2 border rounded text-sm font-mono"
+                      value={currentRate}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setEditingReserves({ ...editingReserves, [r.id]: { amount: currentAmount, rate: val } });
+                      }}
+                    />
+                  </div>
+                  {isEditing && (
+                    <button
+                      onClick={() => {
+                        onUpdateReserve(r.id, currentAmount, currentRate);
+                        const newEditing = { ...editingReserves };
+                        delete newEditing[r.id];
+                        setEditingReserves(newEditing);
+                      }}
+                      className="mt-4 bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-8 text-center text-slate-400 italic">No currency reserves found.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Opening Balance Settings */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100 mx-4 sm:mx-0">
+        <h3 className="font-bold text-slate-800 mb-4">Business Settings</h3>
+        <div className="max-w-md">
+          <label className="block text-sm font-bold text-slate-700 mb-1">Opening Cash Balance (PKR)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              className="flex-1 p-2 border rounded font-mono"
+              value={localOpeningBalance}
+              onChange={(e) => setLocalOpeningBalance(parseFloat(e.target.value) || 0)}
+            />
+            {localOpeningBalance !== openingBalance && (
+              <button
+                onClick={() => onUpdateOpeningBalance(localOpeningBalance)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-indigo-700 transition cursor-pointer"
+              >
+                Save
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">Initial starting capital for the business</p>
+        </div>
+      </div>
     </div>
   );
 };
