@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getFinanceSummary, getTrips, getVehicles, getMaintenanceHistory, getRentals, getCustomers, getDrivers } from '../services/api';
 import { FinancialSummary, Trip, Vehicle, TripStatus, VehicleStatus, MaintenanceRecord, Rental, RentalStatus, Customer, Driver } from '../types';
+import { getVehicleProfitabilityReport, VehicleProfitabilityReport } from '../services/vehicleAnalytics';
 import Card from '../components/Card';
 import { STATUS_COLORS, formatCurrency, CHART_COLORS } from '../constants';
 import { calculateMaintenanceAlerts, MaintenanceAlert } from '../services/maintenanceAlerts';
@@ -18,6 +19,7 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [documentAlerts, setDocumentAlerts] = useState<DocumentAlert[]>([]);
+  const [roiReport, setRoiReport] = useState<VehicleProfitabilityReport[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Date Range Filtering
@@ -56,6 +58,7 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
         setMaintenanceRecords(maintenanceData);
         setMaintenanceAlerts(calculateMaintenanceAlerts(vehiclesData, maintenanceData));
         setDocumentAlerts(getExpiredDocuments(vehiclesData, driversData));
+        setRoiReport(getVehicleProfitabilityReport(vehiclesData, rentalsData, maintenanceData));
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -254,6 +257,54 @@ const DashboardView: React.FC<{ setCurrentView: (view: any) => void }> = ({ setC
           </BarChart>
         </ResponsiveContainer>
       </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <Card title="Fleet ROI Breakdown" className="lg:col-span-2">
+          <div className="h-[300px]">
+             {roiReport.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={roiReport}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="licensePlate" />
+                    <YAxis unit="%" />
+                    <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
+                    <Bar dataKey="roi" name="ROI %" fill="#4f46e5" />
+                  </BarChart>
+                </ResponsiveContainer>
+             ) : (
+                <div className="flex items-center justify-center h-full text-slate-500 text-sm italic">No ROI data available. Add vehicles with purchase prices.</div>
+             )}
+          </div>
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setCurrentView('roi')}
+              className="text-indigo-600 text-sm font-bold hover:underline cursor-pointer"
+            >
+              View Detailed ROI Analysis →
+            </button>
+          </div>
+        </Card>
+
+        <Card title="Maintenance Efficiency" className="lg:col-span-2">
+           <div className="h-[300px]">
+             {roiReport.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={roiReport}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="licensePlate" />
+                    <YAxis tickFormatter={(val) => `PKR ${val / 1000}k`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend />
+                    <Bar dataKey="maintenanceCosts" name="Maintenance" fill="#ef4444" />
+                    <Bar dataKey="netProfit" name="Net Profit" fill="#10b981" />
+                  </BarChart>
+                </ResponsiveContainer>
+             ) : (
+                <div className="flex items-center justify-center h-full text-slate-500 text-sm italic">No performance data available.</div>
+             )}
+          </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card title="Activity Overview (Trips & Rentals)">
