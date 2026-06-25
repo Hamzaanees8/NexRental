@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getDrivers, createDriver, updateDriver, deleteDriver, uploadFile } from '../services/api';
-import { Driver } from '../types';
+import { getDrivers, createDriver, updateDriver, deleteDriver, uploadFile, getChallans } from '../services/api';
+import { Driver, Challan, ChallanStatus } from '../types';
 import { PlusIcon } from '../components/icons';
 import { formatCurrency } from '../constants';
 import { checkDocumentStatus } from '../services/expiryAlerts';
@@ -10,6 +10,7 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 
 const DriversView: React.FC = () => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
+    const [challans, setChallans] = useState<Challan[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,8 +20,12 @@ const DriversView: React.FC = () => {
     const fetchDrivers = async () => {
         setLoading(true);
         try {
-            const data = await getDrivers();
-            setDrivers(data);
+            const [dData, cData] = await Promise.all([
+                getDrivers(),
+                getChallans()
+            ]);
+            setDrivers(dData);
+            setChallans(cData);
         } catch (error) {
             console.error(error);
         } finally {
@@ -146,8 +151,11 @@ const DriversView: React.FC = () => {
                     const licenseStatus = checkDocumentStatus(driver.license_expiry);
                     const cnicStatus = checkDocumentStatus(driver.cnic_expiry);
 
+                    const driverChallans = challans.filter(c => c.driver_id === driver.id && c.is_driver_liable && c.status === ChallanStatus.Unpaid);
+                    const totalLiability = driverChallans.reduce((sum, c) => sum + c.amount, 0);
+
                     return (
-                        <div key={driver.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${licenseStatus === 'expired' || cnicStatus === 'expired' ? 'border-red-200 bg-red-50/30' : licenseStatus === 'expiring_soon' || cnicStatus === 'expiring_soon' ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
+                        <div key={driver.id} className={`bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md transition relative group pt-8 ${licenseStatus === 'expired' || cnicStatus === 'expired' || totalLiability > 0 ? 'border-red-200 bg-red-50/30' : licenseStatus === 'expiring_soon' || cnicStatus === 'expiring_soon' ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100'}`}>
                             <div className="absolute top-2 right-2 flex gap-1 items-center opacity-0 group-hover:opacity-100 transition">
                                 <button
                                     onClick={() => openEditModal(driver)}
@@ -173,7 +181,7 @@ const DriversView: React.FC = () => {
                                             {driver.status}
                                         </span>
                                     </div>
-                                    {(licenseStatus !== 'valid' || cnicStatus !== 'valid') && (
+                                    {(licenseStatus !== 'valid' || cnicStatus !== 'valid' || totalLiability > 0) && (
                                         <div className="flex flex-wrap gap-1 mt-2">
                                             {licenseStatus !== 'valid' && (
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${licenseStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
@@ -183,6 +191,11 @@ const DriversView: React.FC = () => {
                                             {cnicStatus !== 'valid' && (
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${cnicStatus === 'expired' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white'}`}>
                                                     ⚠️ CNIC {cnicStatus === 'expired' ? 'Expired' : 'Expiring Soon'}
+                                                </span>
+                                            )}
+                                            {totalLiability > 0 && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-red-600 text-white">
+                                                    💸 Liability: {formatCurrency(totalLiability)}
                                                 </span>
                                             )}
                                         </div>
