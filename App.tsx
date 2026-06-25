@@ -6,6 +6,7 @@ import TripsView from './views/TripsView';
 import FinancialsView from './views/FinancialsView';
 import MaintenanceView from './views/MaintenanceView';
 import RentalsView from './views/RentalsView';
+import ChallansView from './views/ChallansView';
 import { MenuIcon, LogoIcon } from './components/icons';
 
 import CustomersView from './views/CustomersView';
@@ -15,7 +16,7 @@ import ImportView from './views/ImportView';
 import VehicleROIView from './views/VehicleROIView';
 import { Toaster } from 'react-hot-toast';
 
-type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'settings' | 'import' | 'roi';
+type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'challans' | 'settings' | 'import' | 'roi';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -35,6 +36,8 @@ const App: React.FC = () => {
         return <RentalsView />;
       case 'maintenance':
         return <MaintenanceView />;
+      case 'challans':
+        return <ChallansView />;
       case 'customers':
         return <CustomersView />;
       case 'affiliated':

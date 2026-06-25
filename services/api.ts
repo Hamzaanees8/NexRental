@@ -4,6 +4,8 @@ import {
   Transaction,
   MaintenanceRecord,
   FinancialSummary,
+  Challan,
+  ChallanStatus,
   VehicleStatus,
   TripStatus,
   TransactionType,
@@ -1167,6 +1169,129 @@ export const getPartnerTransactions = async (): Promise<PartnerTransaction[]> =>
     .eq("tenant_id", TENANT_ID);
   if (error) throw new Error(error.message);
   return data as PartnerTransaction[];
+};
+
+// --- CHALLANS ---
+
+export const getChallans = async (): Promise<Challan[]> => {
+  const { data, error } = await supabase
+    .from("challans")
+    .select("*")
+    .eq("tenant_id", TENANT_ID);
+  if (error) throw new Error(error.message);
+  return data as Challan[];
+};
+
+export const createChallan = async (
+  challan: Omit<Challan, "id" | "tenant_id" | "created_at">
+): Promise<Challan> => {
+  const { data, error } = await supabase
+    .from("challans")
+    .insert([{ ...challan, tenant_id: TENANT_ID }])
+    .select();
+  if (error) throw new Error(error.message);
+
+  const createdChallan = data[0] as Challan;
+
+  // Financial Hook: If Paid and business absorbed, create an Expense transaction
+  if (createdChallan.status === ChallanStatus.Paid && createdChallan.is_business_absorbed) {
+    const vehicle = await getVehicle(createdChallan.vehicle_id);
+    await createExpense({
+      amount: createdChallan.amount,
+      date: createdChallan.date,
+      description: `Traffic Challan: ${createdChallan.challan_number} for ${vehicle?.license_plate || createdChallan.vehicle_id}`,
+      vehicle_id: createdChallan.vehicle_id,
+    });
+  }
+
+  return createdChallan;
+};
+
+export const updateChallan = async (
+  id: string,
+  updates: Partial<Challan>
+): Promise<Challan> => {
+  const { data: current, error: fetchError } = await supabase
+    .from("challans")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { data, error } = await supabase
+    .from("challans")
+    .update(updates)
+    .eq("id", id)
+    .select();
+  if (error) throw new Error(error.message);
+
+  const updated = data[0] as Challan;
+
+  // Financial Hook
+  const wasBusinessAbsorbed = current.status === ChallanStatus.Paid && current.is_business_absorbed;
+  const isBusinessAbsorbed = updated.status === ChallanStatus.Paid && updated.is_business_absorbed;
+
+  if (isBusinessAbsorbed && !wasBusinessAbsorbed) {
+    const vehicle = await getVehicle(updated.vehicle_id);
+    await createExpense({
+      amount: updated.amount,
+      date: updated.date,
+      description: `Traffic Challan: ${updated.challan_number} for ${vehicle?.license_plate || updated.vehicle_id}`,
+      vehicle_id: updated.vehicle_id,
+    });
+  } else if (!isBusinessAbsorbed && wasBusinessAbsorbed) {
+    await supabase
+      .from("financial_transactions")
+      .delete()
+      .eq("type", TransactionType.Expense)
+      .eq("vehicle_id", current.vehicle_id)
+      .eq("amount", current.amount)
+      .eq("date", current.date)
+      .ilike("description", `%Challan: ${current.challan_number}%`);
+  } else if (isBusinessAbsorbed && wasBusinessAbsorbed) {
+      // Update existing expense
+      await supabase
+        .from("financial_transactions")
+        .update({
+            amount: updated.amount,
+            date: updated.date,
+            description: `Traffic Challan: ${updated.challan_number} for ${ (await getVehicle(updated.vehicle_id))?.license_plate || updated.vehicle_id}`,
+        })
+        .eq("type", TransactionType.Expense)
+        .eq("vehicle_id", current.vehicle_id)
+        .eq("amount", current.amount)
+        .eq("date", current.date)
+        .ilike("description", `%Challan: ${current.challan_number}%`);
+  }
+
+  return updated;
+};
+
+export const deleteChallan = async (id: string): Promise<void> => {
+  const { data: challan, error: fetchError } = await supabase
+    .from("challans")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  // If it was business absorbed, delete the corresponding expense
+  if (challan.status === ChallanStatus.Paid && challan.is_business_absorbed) {
+    await supabase
+      .from("financial_transactions")
+      .delete()
+      .eq("type", TransactionType.Expense)
+      .eq("vehicle_id", challan.vehicle_id)
+      .eq("amount", challan.amount)
+      .eq("date", challan.date)
+      .ilike("description", `%Challan: ${challan.challan_number}%`);
+  }
+
+  const { error } = await supabase
+    .from("challans")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 };
 
 export const createPartnerTransaction = async (
