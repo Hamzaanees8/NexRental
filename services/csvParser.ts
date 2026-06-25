@@ -1,10 +1,10 @@
 
 /**
  * Simple RFC-4180 compliant CSV parser.
- * Converts a CSV string into an array of objects.
+ * Converts a CSV string into an array of objects, automatically discovering the header row.
  */
 export function parseCSV(csvText: string): Record<string, string>[] {
-  const rows: string[][] = [];
+  const allRows: string[][] = [];
   let currentRow: string[] = [];
   let currentField = '';
   let inQuotes = false;
@@ -34,7 +34,7 @@ export function parseCSV(csvText: string): Record<string, string>[] {
         currentField = '';
       } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
         currentRow.push(currentField.trim());
-        rows.push(currentRow);
+        allRows.push(currentRow);
         currentRow = [];
         currentField = '';
         if (char === '\r') i++; // Skip \n
@@ -44,16 +44,39 @@ export function parseCSV(csvText: string): Record<string, string>[] {
     }
   }
 
-  // Add the last field and row if not empty
   if (currentField || currentRow.length > 0) {
     currentRow.push(currentField.trim());
-    rows.push(currentRow);
+    allRows.push(currentRow);
   }
 
-  if (rows.length < 2) return [];
+  if (allRows.length < 1) return [];
 
-  const headers = rows[0].map(h => h.trim());
-  const data = rows.slice(1);
+  // Discovery: Find the first row that looks like a header
+  const knownKeywords = [
+    'date', 'car', 'tour price', 'profit', // Monthly Rides
+    'now', 'next', 'tuning', 'tyre',      // Engine Oil
+    'opening balance', 'description'       // Balance Sheet
+  ];
+
+  let headerIndex = -1;
+  for (let i = 0; i < Math.min(allRows.length, 20); i++) {
+    const row = allRows[i].map(c => c.toLowerCase());
+    const matchCount = knownKeywords.filter(k => row.includes(k)).length;
+
+    // If a row has at least 2 matching keywords, it's likely the header row
+    if (matchCount >= 2) {
+      headerIndex = i;
+      break;
+    }
+  }
+
+  // If no header found, assume first row (original behavior) or return empty if very messy
+  if (headerIndex === -1) {
+    headerIndex = 0;
+  }
+
+  const headers = allRows[headerIndex].map(h => h.trim());
+  const data = allRows.slice(headerIndex + 1);
 
   return data.map(row => {
     const obj: Record<string, string> = {};
@@ -115,19 +138,31 @@ export function classifyCSV(headers: string[]): CSVType {
  * Maps a row from the Monthly Rides CSV to a Rental or MaintenanceRecord.
  */
 export function mapMonthlyRideRow(row: Record<string, string>, vehicleId: string, customerId: string, driverId?: string): Rental | MaintenanceRecord | null {
+  // Strict Validation: A valid ride row MUST have a Date and either a Tour Price or a Note/Address
+  if (!row['Date'] || row['Date'].toLowerCase() === 'date') return null;
+
   const tourPrice = parseFloat(row['Tour Price'] || '0');
+  const profit = parseFloat(row['Profit'] || '0');
   const date = formatDate(row['Date']);
 
-  // If Tour Price is empty or 0, and there's notes, it might be a maintenance record
-  if (tourPrice === 0 && row['Address']) {
+  // If Tour Price is empty or 0, and there's notes (Address col often contains notes in the sample)
+  if (tourPrice === 0 && (row['Address'] || row['Notes'] || row['Others'] || row['Destination'])) {
+    const notes = row['Address'] || row['Notes'] || row['Others'] || row['Destination'];
+    let type = MaintenanceType.Other;
+
+    // Detect Challan
+    if (notes.toLowerCase().includes('challan')) {
+      type = MaintenanceType.Other; // Could add a specific 'Fine' or 'Challan' type if it existed
+    }
+
     return {
       id: crypto.randomUUID(),
       tenant_id: TENANT_ID,
       vehicle_id: vehicleId,
-      type: MaintenanceType.Other,
-      cost: Math.abs(parseFloat(row['Profit'] || '0')), // In the sample, expenses have negative profit
+      type: type,
+      cost: Math.abs(profit), // In the sample, expenses have negative profit
       date: date,
-      notes: row['Address'],
+      notes: notes,
       odometer: parseFloat(row['Start'] || '0')
     };
   }
@@ -198,8 +233,9 @@ export function mapBalanceSheetRow(row: Record<string, string>, partners: {id: s
 
   // Partner Drawings/Contributions
   partners.forEach(partner => {
+    if (!row[partner.name]) return;
     const amount = parseFloat(row[partner.name] || '0');
-    if (amount !== 0) {
+    if (amount !== 0 && !isNaN(amount)) {
       entities.push({
         id: crypto.randomUUID(),
         tenant_id: TENANT_ID,

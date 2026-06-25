@@ -89,6 +89,11 @@ const ImportView: React.FC = () => {
                 maintenanceToCreate.push(result);
               } else {
                 fileSkipped++;
+                if (!row['Date'] || row['Date'].toLowerCase() === 'date') {
+                  // Probably a header repeat or footer
+                } else {
+                  allErrors.push(`Skipped row in ${files[i].file.name}: Missing critical data or invalid format.`);
+                }
               }
             }
 
