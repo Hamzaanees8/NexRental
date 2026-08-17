@@ -22,6 +22,22 @@ export const AIVoiceAssistant: React.FC = () => {
             console.log('Call ended');
             setIsCalling(false);
             setIsConnecting(false);
+            
+            // Check for new bookings made during the call
+            setTimeout(async () => {
+                const twoMinsAgo = new Date();
+                twoMinsAgo.setMinutes(twoMinsAgo.getMinutes() - 2);
+                
+                const { data, error } = await supabase.from('rentals')
+                    .select('id, vehicles(make_model)')
+                    .gte('created_at', twoMinsAgo.toISOString())
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                    
+                if (data && data.length > 0) {
+                    toast.success(`Booking reserved successfully for ${data[0].vehicles?.make_model || 'your vehicle'}!`, { duration: 6000 });
+                }
+            }, 3000); // 3 second delay to ensure DB insertion is complete
         });
 
         retellWebClient.on('error', (error) => {
