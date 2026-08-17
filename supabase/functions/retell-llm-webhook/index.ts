@@ -11,7 +11,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-const TENANT_ID = 'demo-tenant'; // Ideally passed in context or resolved from auth
+const TENANT_ID = 'tgpmimpzlunsjtxdjikw'; // Ideally passed in context or resolved from auth
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
