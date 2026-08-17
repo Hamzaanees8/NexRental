@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const RETELL_API_KEY = Deno.env.get('RETELL_API_KEY');
-    const RETELL_AGENT_ID = Deno.env.get('RETELL_AGENT_ID');
+    const RETELL_API_KEY = Deno.env.get('RETELL_API_KEY') || 'key_3869109a7f0a784327527e6fdd84';
+    const RETELL_AGENT_ID = Deno.env.get('RETELL_AGENT_ID') || 'agent_025a04b9a228fb38983c53bb39';
 
     if (!RETELL_API_KEY || !RETELL_AGENT_ID) {
       throw new Error('Retell API credentials are not set in environment variables');
