@@ -27,19 +27,18 @@ serve(async (req) => {
       console.log('Call Ended event received:', payload);
     } else if (payload.event === 'update') {
       console.log('Transcript update:', payload);
-    } else if (payload.event === 'response_required') {
-       // Only applicable if using custom LLM endpoint, not Retell LLM.
-       // For Retell LLM, the custom tools come via tool_call event if configured, or through websocket if running own LLM.
-    } else if (payload.event === 'tool_call') { // Depending on how Retell Webhook for tool calls is configured
-       // Often, Retell sends custom tool calls to your backend if you configure it to do so.
-       // Or you are building your own LLM backend. Assuming Retell calls this webhook for tools:
+    } else if (payload.event === 'tool_call' || payload.function_name) { 
        console.log('Tool call received:', payload);
-       const { name, arguments: args } = payload.tool_call;
+       
+       // Handle both standard webhook (payload.tool_call) and direct custom tool payload (payload.function_name)
+       const name = payload.event === 'tool_call' ? payload.tool_call.name : payload.function_name;
+       const args = payload.event === 'tool_call' ? payload.tool_call.arguments : JSON.stringify(payload.args);
 
        let result: any = null;
 
        if (name === 'check_availability') {
-          const { start_date, end_date, vehicle_type } = JSON.parse(args);
+          const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
+          const { start_date, end_date, vehicle_type } = parsedArgs;
           
           // Basic logic: Fetch all active vehicles of type, check if they overlap with rentals
           let query = supabase.from('vehicles').select('id, make_model, license_plate, type').eq('status', 'Active').eq('tenant_id', TENANT_ID);
@@ -68,7 +67,8 @@ serve(async (req) => {
           result = { available_vehicles: availableVehicles };
 
        } else if (name === 'get_or_create_customer') {
-          const { name: customerName, phone_number } = JSON.parse(args);
+          const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
+          const { name: customerName, phone_number } = parsedArgs;
           
           // Check if customer exists
           const { data: existing, error: eError } = await supabase.from('customers')
@@ -91,7 +91,8 @@ serve(async (req) => {
               result = { customer_id: newCustomer.id, status: 'created' };
           }
        } else if (name === 'book_rental') {
-          const { vehicle_id, customer_id, start_date, end_date, rental_type, rent_amount, pickup_location, destination } = JSON.parse(args);
+          const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
+          const { vehicle_id, customer_id, start_date, end_date, rental_type, rent_amount, pickup_location, destination } = parsedArgs;
           
           const newRental = {
               tenant_id: TENANT_ID,
