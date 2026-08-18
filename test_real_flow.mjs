@@ -78,7 +78,9 @@ async function runRealTest() {
           start_date: startStr,
           end_date: endStr,
           rental_type: 'With Driver',
-          rent_amount: 25000
+          rent_amount: 25000,
+          pickup_location: 'Lahore Airport',
+          destination: 'Serena Hotel Islamabad'
         },
         call: { call_id: 'test_real_3' }
       })
@@ -89,7 +91,7 @@ async function runRealTest() {
     // Let's verify it's actually in the database!
     console.log('\n--- VERIFYING BOOKING IN DATABASE ---');
     const { data: bookingCheck } = await supabase.from('rentals')
-      .select('*, customers(name), vehicles(make_model)')
+      .select('*, customers!rentals_customer_id_fkey(name), vehicles(make_model)')
       .eq('customer_id', customerResult.result.customer_id)
       .order('created_at', { ascending: false })
       .limit(1);
