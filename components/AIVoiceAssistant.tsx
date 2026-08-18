@@ -38,7 +38,9 @@ export const AIVoiceAssistant: React.FC = () => {
                     .limit(1);
                     
                 if (data && data.length > 0) {
-                    toast.success(`Booking reserved successfully for ${data[0].vehicles?.make_model || 'your vehicle'}!`, { duration: 6000 });
+                    const vehicleInfo = data[0].vehicles as any;
+                    const makeModel = Array.isArray(vehicleInfo) ? vehicleInfo[0]?.make_model : vehicleInfo?.make_model;
+                    toast.success(`Booking reserved successfully for ${makeModel || 'your vehicle'}!`, { duration: 6000 });
                 }
             }, 3000); // 3 second delay to ensure DB insertion is complete
         });
