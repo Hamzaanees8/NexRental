@@ -27,7 +27,9 @@ async function executeTool(name: string, args: any) {
   if (name === 'check_availability') {
     const { start_date, end_date, vehicle_type } = args;
     let query = supabase.from('vehicles').select('id, make_model, license_plate, type, rental_rate').eq('status', 'Active').eq('tenant_id', TENANT_ID);
-    if (vehicle_type) query = query.ilike('type', `%${vehicle_type}%`);
+    if (vehicle_type) {
+      query = query.or(`type.ilike.%${vehicle_type}%,make_model.ilike.%${vehicle_type}%`);
+    }
     const { data: vehicles, error: vError } = await query;
     if (vError) throw vError;
 
@@ -63,6 +65,9 @@ async function executeTool(name: string, args: any) {
     return { customer_id: newCustomer.id, status: 'created' };
   } else if (name === 'book_rental') {
     const { vehicle_id, customer_id, start_date, end_date, rental_type, rent_amount, pickup_location, destination } = args;
+    if (!customer_id) {
+      throw new Error("Missing customer_id. You MUST call get_or_create_customer first to obtain a valid customer_id before calling book_rental.");
+    }
     const newRental = {
       tenant_id: TENANT_ID,
       vehicle_id,
