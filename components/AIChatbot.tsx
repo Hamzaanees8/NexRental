@@ -55,7 +55,15 @@ export const AIChatbot: React.FC = () => {
     } catch (error: any) {
       console.error('Chat error:', error);
       toast.error('Failed to send message. Please try again.');
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error communicating with my servers.' }]);
+      
+      let errorMessage = 'Sorry, I encountered an error communicating with my servers.';
+      if (error.message && error.message.includes('Rate limit')) {
+        errorMessage = 'Sorry, I am currently receiving too many requests (Rate Limit Reached). Please wait a few seconds and try again.';
+      } else if (error.message && error.message.includes('AI Provider Error')) {
+        errorMessage = 'Sorry, my AI provider is currently overloaded or experiencing an issue. Please try again in a moment.';
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
     } finally {
       setIsLoading(false);
     }
