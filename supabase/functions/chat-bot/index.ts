@@ -104,6 +104,8 @@ async function executeTool(name: string, args: any) {
         message: 'Booking confirmed as Reserved.',
         ...(driverDetails ? { driver_assigned: `${driverDetails.name} (Phone: ${driverDetails.phone})` } : {})
     };
+  } else if (name === 'end_call') {
+    return { success: true, message: 'Call ended successfully.' };
   }
   return { error: 'Unknown tool' };
 }
