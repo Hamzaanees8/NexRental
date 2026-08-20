@@ -41,8 +41,8 @@ async function executeTool(name: string, args: any) {
       .gte('end_time', start_date);
     if (rError) throw rError;
 
-    const bookedVehicleIds = new Set(rentals.map(r => r.vehicle_id));
-    const availableVehicles = vehicles.filter(v => !bookedVehicleIds.has(v.id));
+    const bookedVehicleIds = new Set(rentals.map((r: any) => r.vehicle_id));
+    const availableVehicles = vehicles.filter((v: any) => !bookedVehicleIds.has(v.id));
     return { available_vehicles: availableVehicles };
   } else if (name === 'get_or_create_customer') {
     const { name: customerName, phone_number } = args;
@@ -82,7 +82,7 @@ async function executeTool(name: string, args: any) {
   return { error: 'Unknown tool' };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -95,7 +95,7 @@ serve(async (req) => {
     if (Deno.env.get('GROQ_API_KEY')) {
       apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
       apiKey = Deno.env.get('GROQ_API_KEY');
-      model = 'llama-3.3-70b-versatile';
+      model = 'openai/gpt-oss-20b';
     } else if (Deno.env.get('GEMINI_API_KEY')) {
       apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
       apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -144,10 +144,13 @@ serve(async (req) => {
     });
 
     let openAiData = await openAiRes.json();
+    if (!openAiData.choices || !openAiData.choices[0]) {
+      throw new Error(`AI Provider Error: ${JSON.stringify(openAiData)}`);
+    }
     let responseMessage = openAiData.choices[0].message;
 
     // 3. Handle Tool Calls if the LLM decided to invoke one
-    if (responseMessage.tool_calls) {
+    while (responseMessage.tool_calls) {
       apiMessages.push(responseMessage); // append assistant's tool call
 
       for (const toolCall of responseMessage.tool_calls) {
@@ -164,7 +167,7 @@ serve(async (req) => {
             name: functionName,
             content: JSON.stringify(toolResult)
           });
-        } catch (e) {
+        } catch (e: any) {
           apiMessages.push({
             tool_call_id: toolCall.id,
             role: 'tool',
@@ -174,8 +177,8 @@ serve(async (req) => {
         }
       }
 
-      // 4. Send the tool results back to the AI provider for the final natural language response
-      const secondRes = await fetch(apiUrl, {
+      // 4. Send the tool results back to the AI provider for the next natural language response or tool call
+      const nextRes = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -184,23 +187,24 @@ serve(async (req) => {
         body: JSON.stringify({
           model: model,
           messages: apiMessages,
+          tools: tools,
         })
       });
 
-      const secondData = await secondRes.json();
-      return new Response(JSON.stringify(secondData.choices[0].message), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+      const nextData = await nextRes.json();
+      if (!nextData.choices || !nextData.choices[0]) {
+        throw new Error(`AI Provider Error (Follow-up Call): ${JSON.stringify(nextData)}`);
+      }
+      responseMessage = nextData.choices[0].message;
     }
 
-    // No tool calls, just return the text response
+    // No more tool calls, just return the final text response
     return new Response(JSON.stringify(responseMessage), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Chatbot error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
