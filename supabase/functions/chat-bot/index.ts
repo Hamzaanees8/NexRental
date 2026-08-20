@@ -88,27 +88,50 @@ serve(async (req: Request) => {
   }
 
   try {
-    let apiUrl = 'https://api.openai.com/v1/chat/completions';
-    let apiKey = Deno.env.get('OPENAI_API_KEY');
-    let model = 'gpt-4o-mini';
-
+    const providers = [];
     if (Deno.env.get('GROQ_API_KEY')) {
-      apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      apiKey = Deno.env.get('GROQ_API_KEY');
-      model = 'openai/gpt-oss-20b';
-    } else if (Deno.env.get('GEMINI_API_KEY')) {
-      apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-      apiKey = Deno.env.get('GEMINI_API_KEY');
-      model = 'gemini-1.5-flash';
-    } else if (Deno.env.get('OPENROUTER_API_KEY')) {
-      apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-      apiKey = Deno.env.get('OPENROUTER_API_KEY');
-      model = 'meta-llama/llama-3.3-70b-instruct'; 
+      providers.push({ url: 'https://api.groq.com/openai/v1/chat/completions', key: Deno.env.get('GROQ_API_KEY'), model: 'openai/gpt-oss-20b' });
     }
-
-    if (!apiKey) {
+    if (Deno.env.get('OPENROUTER_API_KEY')) {
+      providers.push({ url: 'https://openrouter.ai/api/v1/chat/completions', key: Deno.env.get('OPENROUTER_API_KEY'), model: 'meta-llama/llama-3.3-70b-instruct' });
+    }
+    if (Deno.env.get('GEMINI_API_KEY')) {
+      providers.push({ url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: Deno.env.get('GEMINI_API_KEY'), model: 'gemini-1.5-flash' });
+    }
+    if (Deno.env.get('OPENAI_API_KEY')) {
+      providers.push({ url: 'https://api.openai.com/v1/chat/completions', key: Deno.env.get('OPENAI_API_KEY'), model: 'gpt-4o-mini' });
+    }
+    
+    if (providers.length === 0) {
       throw new Error('No AI Provider API key found. Please configure GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, or OPENAI_API_KEY in your Supabase secrets.');
     }
+
+    // Helper to fetch with automatic fallback
+    const fetchWithFallback = async (bodyPayload: any) => {
+      let lastError = null;
+      for (const provider of providers) {
+        try {
+          console.log(`Trying AI Provider: ${provider.model}`);
+          const res = await fetch(provider.url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${provider.key}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ...bodyPayload, model: provider.model })
+          });
+          const data = await res.json();
+          if (!data.choices || !data.choices[0]) {
+            throw new Error(`AI Provider Error: ${JSON.stringify(data)}`);
+          }
+          return data.choices[0].message;
+        } catch (err: any) {
+          console.warn(`Provider ${provider.model} failed: ${err.message}`);
+          lastError = err;
+        }
+      }
+      throw new Error(`All AI providers failed. Last error: ${lastError?.message}`);
+    };
 
     const { messages } = await req.json();
 
@@ -128,26 +151,12 @@ serve(async (req: Request) => {
     const systemMessage = { role: 'system', content: retellConfig.general_prompt };
     const apiMessages = [systemMessage, ...messages];
 
-    // 2. Call AI Provider directly using Retell's configuration
-    let openAiRes = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: apiMessages,
-        tools: tools,
-        tool_choice: 'auto',
-      })
+    // 2. Call AI Provider directly using Retell's configuration (with fallback logic)
+    let responseMessage = await fetchWithFallback({
+      messages: apiMessages,
+      tools: tools,
+      tool_choice: 'auto'
     });
-
-    let openAiData = await openAiRes.json();
-    if (!openAiData.choices || !openAiData.choices[0]) {
-      throw new Error(`AI Provider Error: ${JSON.stringify(openAiData)}`);
-    }
-    let responseMessage = openAiData.choices[0].message;
 
     // 3. Handle Tool Calls if the LLM decided to invoke one
     while (responseMessage.tool_calls) {
@@ -178,24 +187,10 @@ serve(async (req: Request) => {
       }
 
       // 4. Send the tool results back to the AI provider for the next natural language response or tool call
-      const nextRes = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: apiMessages,
-          tools: tools,
-        })
+      responseMessage = await fetchWithFallback({
+        messages: apiMessages,
+        tools: tools
       });
-
-      const nextData = await nextRes.json();
-      if (!nextData.choices || !nextData.choices[0]) {
-        throw new Error(`AI Provider Error (Follow-up Call): ${JSON.stringify(nextData)}`);
-      }
-      responseMessage = nextData.choices[0].message;
     }
 
     // No more tool calls, just return the final text response
