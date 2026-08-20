@@ -74,7 +74,7 @@ export const AIChatbot: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[60] flex flex-col items-end gap-4">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-24 z-[60] flex flex-col items-end gap-4">
       {isOpen && (
         <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-[calc(100vw-2rem)] sm:w-96 h-[70vh] max-h-[600px] sm:h-[500px] overflow-hidden flex flex-col animate-in slide-in-from-bottom-5 fade-in duration-300">
           {/* Header */}
