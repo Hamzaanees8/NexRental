@@ -16,6 +16,7 @@ import ImportView from './views/ImportView';
 import VehicleROIView from './views/VehicleROIView';
 import { Toaster } from 'react-hot-toast';
 import { AIVoiceAssistant } from './components/AIVoiceAssistant';
+import { AIChatbot } from './components/AIChatbot';
 type View = 'dashboard' | 'fleet' | 'trips' | 'financials' | 'maintenance' | 'rentals' | 'customers' | 'affiliated' | 'drivers' | 'challans' | 'settings' | 'import' | 'roi';
 
 const App: React.FC = () => {
@@ -51,7 +52,7 @@ const App: React.FC = () => {
       case 'roi':
         return <VehicleROIView />;
       default:
-        return <DashboardView />;
+        return <DashboardView setCurrentView={setCurrentView} />;
     }
   };
 
@@ -87,6 +88,7 @@ const App: React.FC = () => {
         </main>
       </div>
       
+      <AIChatbot />
       <AIVoiceAssistant />
     </div>
   );
