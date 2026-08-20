@@ -112,11 +112,11 @@ export const AIVoiceAssistant: React.FC = () => {
     }, [transcripts]);
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-auto sm:right-6 z-[60] flex flex-col items-start sm:items-end">
             
             {/* Live Subtitles Box */}
             {isCalling && (
-                <div className="mb-4 w-80 max-h-96 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col transition-all duration-300 transform origin-bottom-right">
+                <div className="mb-4 w-[calc(100vw-2rem)] sm:w-80 max-h-96 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col transition-all duration-300 transform origin-bottom-left sm:origin-bottom-right">
                     <div className="bg-indigo-600 p-3 text-white flex justify-between items-center shadow-sm">
                         <span className="font-semibold text-sm flex items-center gap-2">
                             <span className="relative flex h-3 w-3">
