@@ -1178,7 +1178,11 @@ export const getChallans = async (): Promise<Challan[]> => {
     .from("challans")
     .select("*")
     .eq("tenant_id", TENANT_ID);
+  
+  // If the table doesn't exist yet, gracefully return empty array
+  if (error && error.code === 'PGRST205') return [];
   if (error) throw new Error(error.message);
+  
   return data as Challan[];
 };
 
