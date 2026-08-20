@@ -68,10 +68,25 @@ async function executeTool(name: string, args: any) {
     if (!customer_id) {
       throw new Error("Missing customer_id. You MUST call get_or_create_customer first to obtain a valid customer_id before calling book_rental.");
     }
+
+    let assignedDriverId = null;
+    let driverDetails = null;
+
+    if (rental_type && rental_type.toLowerCase().includes('driver')) {
+        const { data: drivers } = await supabase.from('drivers').select('*').eq('status', 'Available').limit(1);
+        if (drivers && drivers.length > 0) {
+            assignedDriverId = drivers[0].id;
+            driverDetails = drivers[0];
+        } else {
+            throw new Error("No drivers are currently available. Please inform the user and ask if they want to proceed with Self Drive instead.");
+        }
+    }
+
     const newRental = {
       tenant_id: TENANT_ID,
       vehicle_id,
       customer_id,
+      driver_id: assignedDriverId,
       start_time: start_date,
       end_time: end_date,
       rental_type: rental_type || 'Self Drive',
@@ -82,7 +97,13 @@ async function executeTool(name: string, args: any) {
     };
     const { data, error } = await supabase.from('rentals').insert([newRental]).select('id').single();
     if (error) throw error;
-    return { success: true, booking_id: data.id, message: 'Booking confirmed as Reserved.' };
+    
+    return { 
+        success: true, 
+        booking_id: data.id, 
+        message: 'Booking confirmed as Reserved.',
+        ...(driverDetails ? { driver_assigned: `${driverDetails.name} (Phone: ${driverDetails.phone})` } : {})
+    };
   }
   return { error: 'Unknown tool' };
 }
@@ -153,7 +174,15 @@ serve(async (req: Request) => {
       }
     }));
 
-    const systemMessage = { role: 'system', content: retellConfig.general_prompt };
+    const CRITICAL_INSTRUCTIONS = `
+\nCRITICAL INSTRUCTIONS TO FOLLOW STRICTLY:
+1. DO NOT ever call the book_rental tool without FIRST asking the user for their Full Name and Phone Number, and then successfully calling the get_or_create_customer tool to obtain a customer_id.
+2. If you receive an error from any tool (like missing customer_id), DO NOT tell the user the booking was successful. Instead, apologize and ask for the missing information.
+3. If the user explicitly asks for a rental "With Driver", DO NOT mention anything about self-drive rules or CNIC at the office. Only mention self-drive if they chose self-drive.
+4. When confirming a booking that is "With Driver", you MUST provide the assigned driver's Name and Phone Number to the user if the tool returns it.
+5. If the book_rental tool returns an error saying "No drivers are currently available", inform the user and ask if they prefer Self Drive.
+`;
+    const systemMessage = { role: 'system', content: retellConfig.general_prompt + CRITICAL_INSTRUCTIONS };
     const apiMessages = [systemMessage, ...messages];
 
     // 2. Call AI Provider directly using Retell's configuration (with fallback logic)
